@@ -35,7 +35,7 @@ class BannerDataset(Dataset):
         self.tokenizer = tokenizer
         self.mode = mode
         self.data_dir = data_cfg.DATA_DIR
-        self.data_csv_path = data_cfg.DATA.TRAIN_CSV_PATH if mode == "train" else data_cfg.DATA.TEST_CSV_PATH
+        self.data_csv_path = data_cfg.TRAIN_CSV_PATH if mode == "train" else data_cfg.TEST_CSV_PATH
         self.data = pd.read_csv(self.data_csv_path)
 
     def __len__(self):
