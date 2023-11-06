@@ -36,6 +36,7 @@ class BannerDataset(Dataset):
         self.mode = mode
         self.data_dir = data_cfg.DATA_DIR
         self.data_csv_path = data_cfg.TRAIN_CSV_PATH if mode == "train" else data_cfg.TEST_CSV_PATH
+        self.data_csv_path = os.path.join(self.data_dir, self.data_csv_path)
         self.data = pd.read_csv(self.data_csv_path)
 
     def __len__(self):
