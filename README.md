@@ -1,4 +1,4 @@
-# Text Image Matching
+# ZaloAI2023: Banner Generation 
 
 ### Data preparation
 Organize them in dataset folder as follows:
