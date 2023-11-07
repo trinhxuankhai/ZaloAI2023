@@ -34,14 +34,14 @@ if __name__ == '__main__':
     test_data = pd.read_csv("./data/test/info.csv")
 
     for i in tqdm(range(len(train_data))):
-        train_data.loc[i, "caption"] = translator(train_data.loc[i, "caption"])
-        train_data.loc[i, "description"] = translator(train_data.loc[i, "description"])
-        train_data.loc[i, "moreInfo"] = translator(train_data.loc[i, "moreInfo"])
+        train_data.loc[i, "caption"] = translator(str(train_data.loc[i, "caption"]))
+        train_data.loc[i, "description"] = translator(str(train_data.loc[i, "description"]))
+        train_data.loc[i, "moreInfo"] = translator(str(train_data.loc[i, "moreInfo"]))
 
     for i in tqdm(range(len(test_data))):
-        test_data.loc[i, "caption"] = translator(test_data.loc[i, "caption"])
-        test_data.loc[i, "description"] = translator(test_data.loc[i, "description"])
-        test_data.loc[i, "moreInfo"] = translator(test_data.loc[i, "moreInfo"])
+        test_data.loc[i, "caption"] = translator(str(test_data.loc[i, "caption"]))
+        test_data.loc[i, "description"] = translator(str(test_data.loc[i, "description"]))
+        test_data.loc[i, "moreInfo"] = translator(str(test_data.loc[i, "moreInfo"]))
     
     train_data.to_csv('./data/train/info_trans.csv')
     test_data.to_csv('./data/test/info_trans.csv')
