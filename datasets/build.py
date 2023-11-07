@@ -15,7 +15,7 @@ def build_dataloader(cfg, tokenizer):
 
     train_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, mode="train")
     test_dataset = BannerDataset(cfg.DATA, tokenizer, transform=None, mode="test")
-    val_dataset = torch.utils.data.Subset(train_dataset, list(range(0, 10)))
+    val_dataset = torch.utils.data.Subset(test_dataset, list(range(0, 10)))
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
@@ -36,7 +36,7 @@ def build_dataloader(cfg, tokenizer):
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
         shuffle=False,
-        collate_fn=train_collate_fn,
+        collate_fn=test_collate_fn,
         batch_size=1,
         num_workers=cfg.TRAIN.NUM_WORKERS
     )

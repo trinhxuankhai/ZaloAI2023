@@ -16,7 +16,7 @@ def tokenize_caption(caption, tokenizer):
 def train_collate_fn(samples):
     pixel_values = torch.stack([sample["pixel_values"] for sample in samples])
     pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
-    input_ids = torch.stack([sample["input_ids"] for sample in samples])
+    input_ids = torch.cat([sample["input_ids"] for sample in samples], dim=0)
     return {"pixel_values": pixel_values, "input_ids": input_ids}
 
 def test_collate_fn(samples):
@@ -59,7 +59,6 @@ class BannerDataset(Dataset):
         # Load caption
         caption = sample["caption"]
         caption_ids = tokenize_caption(caption, self.tokenizer)
-        print(caption_ids.shape)
         
         if self.mode == "train":
             return {"pixel_values": image, 
