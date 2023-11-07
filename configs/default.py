@@ -10,8 +10,8 @@ dataset_path = os.path.join(BASE_DIR, "../data")
 # DATA
 _C.DATA = CN()
 _C.DATA.DATA_DIR = dataset_path
-_C.DATA.TRAIN_CSV_PATH = 'train/info.csv'
-_C.DATA.TEST_CSV_PATH = 'test/info.csv'
+_C.DATA.TRAIN_CSV_PATH = 'train/info_trans.csv'
+_C.DATA.TEST_CSV_PATH = 'test/info_trans.csv'
 _C.DATA.RESOLUTION = 512
 _C.DATA.CENTER_CROP = False
 _C.DATA.RANDOM_FLIP = False
