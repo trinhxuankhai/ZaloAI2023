@@ -1,5 +1,3 @@
 diffusers
 transformers
 wandb
-xformers
-bitsandbytes
