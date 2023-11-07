@@ -30,6 +30,7 @@ def test_collate_fn(samples):
 class BannerDataset(Dataset):
     def __init__(self, data_cfg, tokenizer, transform=None, mode='train') -> None:
         super().__init__()
+        assert (mode not in ["train", "test"]), "Please specify correct data mode !"
         self.data_cfg = data_cfg
         self.transform = transform
         self.tokenizer = tokenizer
@@ -51,7 +52,7 @@ class BannerDataset(Dataset):
         sample = self.data.iloc[index]
         
         # Load image
-        image = default_loader(os.path.join(self.data_dir, "images/", sample["bannerImage"]))
+        image = default_loader(os.path.join(self.data_dir, self.mode, "images/", sample["bannerImage"]))
         if self.transform is not None:
             image = self.transform(image)
 
