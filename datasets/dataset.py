@@ -20,12 +20,10 @@ def train_collate_fn(samples):
     return {"pixel_values": pixel_values, "input_ids": input_ids}
 
 def test_collate_fn(samples):
-    images = torch.stack([sample["images"] for sample in samples])
     captions = []
     for sample in samples:
         captions.append(sample["captions"])
-    return {"images": images,
-            "captions": captions}
+    return {"captions": captions}
 
 class BannerDataset(Dataset):
     def __init__(self, data_cfg, tokenizer, transform=None, mode='train') -> None:
@@ -50,19 +48,19 @@ class BannerDataset(Dataset):
         3  | Áo .... | Mua ngay .. | Miễn phí ...| 3.jpg
         '''
         sample = self.data.iloc[index]
-        
-        # Load image
-        image = default_loader(os.path.join(self.data_dir, self.mode, "images/", sample["bannerImage"]))
-        if self.transform is not None:
-            image = self.transform(image)
 
         # Load caption
         caption = sample["caption"]
-        caption_ids = tokenize_caption(caption, self.tokenizer)
         
         if self.mode == "train":
+            # Load image
+            image = default_loader(os.path.join(self.data_dir, self.mode, "images/", sample["bannerImage"]))
+            if self.transform is not None:
+                image = self.transform(image)
+        
+            caption_ids = tokenize_caption(caption, self.tokenizer)
+        
             return {"pixel_values": image, 
                     "input_ids": caption_ids}
         else:
-            return {"images": image,
-                    "captions": caption}
+            return {"captions": caption}
