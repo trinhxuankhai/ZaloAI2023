@@ -59,6 +59,7 @@ class BannerDataset(Dataset):
         # Load caption
         caption = sample["caption"]
         caption_ids = tokenize_caption(caption, self.tokenizer)
+        print(caption_ids.shape)
         
         if self.mode == "train":
             return {"pixel_values": image, 
