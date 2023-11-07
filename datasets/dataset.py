@@ -30,7 +30,7 @@ def test_collate_fn(samples):
 class BannerDataset(Dataset):
     def __init__(self, data_cfg, tokenizer, transform=None, mode='train') -> None:
         super().__init__()
-        assert (mode not in ["train", "test"]), "Please specify correct data mode !"
+        assert (mode in ["train", "test"]), "Please specify correct data mode !"
         self.data_cfg = data_cfg
         self.transform = transform
         self.tokenizer = tokenizer
