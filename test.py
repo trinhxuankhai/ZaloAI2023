@@ -168,7 +168,7 @@ def main():
         generator = generator.manual_seed(cfg.TRAIN.SEED)
     
     # create output folder
-    if os.path.exists(args.output_dir):
+    if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
 
     for sample in test_dataloader:
