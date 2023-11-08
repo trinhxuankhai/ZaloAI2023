@@ -1,31 +1,16 @@
-import wandb
-import argparse
-import logging
-import math
 import os
-import shutil
-from pathlib import Path
-
-from datasets.build import build_dataloader
+import cv2
 import torch
-import torch.nn.functional as F
+import argparse
+from tqdm.auto import tqdm
 import torch.utils.checkpoint
-import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from accelerate.utils import ProjectConfiguration, set_seed
-from packaging import version
-from tqdm.auto import tqdm
-from transformers import CLIPTextModel, CLIPTokenizer
-
-import diffusers
-from diffusers import AutoencoderKL, DDPMScheduler, DiffusionPipeline, UNet2DConditionModel
+from datasets.build import build_dataloader
+from transformers import CLIPTokenizer
+from diffusers import DiffusionPipeline, UNet2DConditionModel
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
-from diffusers.optimization import get_scheduler
-from diffusers.training_utils import compute_snr
-from diffusers.utils.import_utils import is_xformers_available
-
 from configs.default import get_default_config
 
 logger = get_logger(__name__, log_level="INFO")
@@ -41,9 +26,15 @@ def parse_args():
         help="Revision of pretrained model identifier from huggingface.co/models.",
     )
     parser.add_argument(
-        "--output_dir",
+        "--checkpoint_dir",
         type=str,
         default="./checkpoints/baseline",
+        help="The output directory where the model predictions and checkpoints will be written.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
@@ -78,7 +69,6 @@ def parse_args():
 
 def main():
     args, cfg = parse_args()
-
     accelerator = Accelerator()
 
     # Load scheduler, tokenizer and models.
@@ -139,7 +129,7 @@ def main():
             path = os.path.basename(args.resume_from_checkpoint)
         else:
             # Get the most recent checkpoint
-            dirs = os.listdir(args.output_dir)
+            dirs = os.listdir(args.checkpoint_dir)
             dirs = [d for d in dirs if d.startswith("checkpoint")]
             dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
             path = dirs[-1] if len(dirs) > 0 else None
@@ -151,7 +141,7 @@ def main():
             args.resume_from_checkpoint = None
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(args.output_dir, path))
+            accelerator.load_state(os.path.join(args.checkpoint_dir, path))
     
     progress_bar = tqdm(
         range(0, len(test_dataloader)),
@@ -178,13 +168,14 @@ def main():
     if cfg.TRAIN.SEED is not None:
         generator = generator.manual_seed(cfg.TRAIN.SEED)
     
-    images = []
-    captions = []
+    # create output folder
+    if os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir, exist_ok=True)
+
     for sample in test_dataloader:
-        images.append(
-            pipeline(sample["captions"][0], num_inference_steps=30, generator=generator).images[0]
-        )
-        captions.append(sample["captions"][0])
+        save_path = os.path.join(args.output_dir, sample["paths"][0])
+        image = pipeline(sample["captions"][0], num_inference_steps=30, generator=generator).images[0]
+        cv2.imwrite(save_path, image)    
         progress_bar.update(1)
 
 if __name__ == "__main__":

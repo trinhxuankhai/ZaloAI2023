@@ -21,9 +21,12 @@ def train_collate_fn(samples):
 
 def test_collate_fn(samples):
     captions = []
+    paths = []
     for sample in samples:
         captions.append(sample["captions"])
-    return {"captions": captions}
+        paths.append(sample["paths"])
+    return {"captions": captions,
+            "paths": paths}
 
 class BannerDataset(Dataset):
     def __init__(self, data_cfg, tokenizer, transform=None, mode='train') -> None:
@@ -63,4 +66,5 @@ class BannerDataset(Dataset):
             return {"pixel_values": image, 
                     "input_ids": caption_ids}
         else:
-            return {"captions": caption}
+            return {"captions": caption,
+                    "paths": sample["bannerImage"]}

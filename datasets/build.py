@@ -29,7 +29,7 @@ def build_dataloader(cfg, tokenizer):
         test_dataset,
         shuffle=False,
         collate_fn=test_collate_fn,
-        batch_size=cfg.TRAIN.BATCH_SIZE,
+        batch_size=1,
         num_workers=cfg.TRAIN.NUM_WORKERS
     )
 
