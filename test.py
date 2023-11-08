@@ -1,5 +1,4 @@
 import os
-import cv2
 import torch
 import argparse
 from tqdm.auto import tqdm
@@ -175,7 +174,7 @@ def main():
     for sample in test_dataloader:
         save_path = os.path.join(args.output_dir, sample["paths"][0])
         image = pipeline(sample["captions"][0], num_inference_steps=30, generator=generator).images[0]
-        cv2.imwrite(save_path, image)    
+        image.save(save_path)
         progress_bar.update(1)
 
 if __name__ == "__main__":
