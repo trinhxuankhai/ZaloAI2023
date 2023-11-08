@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 import argparse
 from tqdm.auto import tqdm
@@ -171,11 +172,16 @@ def main():
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
 
+    start = time.time()
     for sample in test_dataloader:
-        save_path = os.path.join(args.output_dir, sample["paths"][0])
-        image = pipeline(sample["captions"][0], num_inference_steps=30, generator=generator).images[0]
-        image.save(save_path)
+        save_paths = os.path.join(args.output_dir, sample["paths"])
+        images = pipeline(sample["captions"], num_inference_steps=30, generator=generator).images
+        for image, save_path in zip(images, save_paths):
+            image.save(save_path)
         progress_bar.update(1)
-
+    end = time.time()
+    logger.info(
+        f"Total inference time: {end-start} s"
+    )
 if __name__ == "__main__":
     main()
