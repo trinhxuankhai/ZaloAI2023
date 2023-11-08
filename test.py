@@ -174,8 +174,12 @@ def main():
 
     start = time.time()
     for sample in test_dataloader:
-        save_paths = os.path.join(args.output_dir, sample["paths"])
+        save_paths = []
+        for path in sample["paths"]:
+            save_paths.append(os.path.join(args.output_dir, path))
+
         images = pipeline(sample["captions"], num_inference_steps=30, generator=generator).images
+
         for image, save_path in zip(images, save_paths):
             image.save(save_path)
         progress_bar.update(1)
