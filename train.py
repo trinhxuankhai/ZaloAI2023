@@ -504,6 +504,7 @@ def main():
         save_path = os.path.join(args.output_dir, f"final-checkpoint")
         accelerator.save_state(save_path)
         logger.info(f"Saved model to {save_path}")
+        
     accelerator.end_training()
 
 
