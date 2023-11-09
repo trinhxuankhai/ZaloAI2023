@@ -1,13 +1,25 @@
 import torch
 from torchvision import transforms
 from .dataset import BannerDataset, train_collate_fn, test_collate_fn
+from .random_aug import RandAugment
 
 def build_dataloader(cfg, tokenizer):
+    # train_transform = transforms.Compose(
+    #     [
+    #         transforms.Resize(cfg.DATA.RESOLUTION, interpolation=transforms.InterpolationMode.BILINEAR),
+    #         transforms.CenterCrop(cfg.DATA.RESOLUTION) if cfg.DATA.CENTER_CROP else transforms.RandomCrop(cfg.DATA.RESOLUTION),
+    #         transforms.RandomHorizontalFlip() if cfg.DATA.RANDOM_FLIP else transforms.Lambda(lambda x: x),
+    #         transforms.ToTensor(),
+    #         transforms.Normalize([0.5], [0.5]),
+    #     ]
+    # )
+
     train_transform = transforms.Compose(
         [
             transforms.Resize(cfg.DATA.RESOLUTION, interpolation=transforms.InterpolationMode.BILINEAR),
             transforms.CenterCrop(cfg.DATA.RESOLUTION) if cfg.DATA.CENTER_CROP else transforms.RandomCrop(cfg.DATA.RESOLUTION),
             transforms.RandomHorizontalFlip() if cfg.DATA.RANDOM_FLIP else transforms.Lambda(lambda x: x),
+            RandAugment(n=5, m=10) if cfg.DATA.RANDOM_AUG else transforms.Lambda(lambda x: x),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5]),
         ]

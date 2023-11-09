@@ -15,6 +15,7 @@ _C.DATA.TEST_CSV_PATH = 'test/info_trans.csv'
 _C.DATA.RESOLUTION = 512
 _C.DATA.CENTER_CROP = False
 _C.DATA.RANDOM_FLIP = False
+_C.DATA.RANDOM_AUG = False
 
 # Model specific configurations.
 _C.MODEL = CN()
