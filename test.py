@@ -178,9 +178,10 @@ def main():
         for path in sample["paths"]:
             save_paths.append(os.path.join(args.output_dir, path))
 
-        images = pipeline(sample["captions"], num_inference_steps=30, generator=generator).images
+        images = pipeline(sample["captions"], num_inference_steps=30, generator=generator, height=536, width=1024).images
 
         for image, save_path in zip(images, save_paths):
+            image = image.resize((1024, 533))
             image.save(save_path)
         progress_bar.update(1)
     end = time.time()
