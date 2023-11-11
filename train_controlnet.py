@@ -453,7 +453,7 @@ def main():
             pipeline = StableDiffusionControlNetPipeline.from_pretrained(
                 cfg.MODEL.NAME,
                 unet=accelerator.unwrap_model(unet),
-                controlnet=accelerator.unwrap_model(controlnet).to(weight_dtype),
+                controlnet=accelerator.unwrap_model(controlnet),
                 revision=args.revision,
                 torch_dtype=weight_dtype,
             )
@@ -468,9 +468,10 @@ def main():
             images = []
             captions = []
             for sample in train_dataloader:
-                images.append(
-                    pipeline(sample["captions"], num_inference_steps=30, generator=generator, image=sample["conditioning_pixel_values"]).images[0]
-                )
+                with torch.autocast("cuda"):
+                    images.append(
+                        pipeline(sample["captions"], num_inference_steps=30, generator=generator, image=sample["conditioning_pixel_values"]).images[0]
+                    )
                 captions.append(sample["captions"][0])
 
             for tracker in accelerator.trackers:
