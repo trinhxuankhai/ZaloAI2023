@@ -300,20 +300,15 @@ def main():
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
         train_loss = 0.0
         # for step, batch in enumerate(train_dataloader):
-        #     with accelerator.accumulate(controlnet, unet):
+        #     with accelerator.accumulate(controlnet):
         #         # Convert images to latent space
         #         latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
         #         latents = latents * vae.config.scaling_factor
 
         #         # Sample noise that we'll add to the latents
         #         noise = torch.randn_like(latents)
-        #         if cfg.MODEL.NOISE_OFFSET:
-        #             # https://www.crosslabs.org//blog/diffusion-with-offset-noise
-        #             noise += cfg.MODEL.NOISE_OFFSET * torch.randn(
-        #                 (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
-        #             )
-
         #         bsz = latents.shape[0]
+        
         #         # Sample a random timestep for each image
         #         timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
         #         timesteps = timesteps.long()
@@ -334,18 +329,6 @@ def main():
         #             return_dict=False,
         #         )
 
-        #         # Get the target for loss depending on the prediction type
-        #         if args.prediction_type is not None:
-        #             # set prediction_type of scheduler if defined
-        #             noise_scheduler.register_to_config(prediction_type=args.prediction_type)
-
-        #         if noise_scheduler.config.prediction_type == "epsilon":
-        #             target = noise
-        #         elif noise_scheduler.config.prediction_type == "v_prediction":
-        #             target = noise_scheduler.get_velocity(latents, noise, timesteps)
-        #         else:
-        #             raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
-
         #         # Predict the noise residual and compute loss
         #         model_pred = unet(noisy_latents, 
         #                           timesteps, 
@@ -353,23 +336,18 @@ def main():
         #                           down_block_additional_residuals=[sample.to(dtype=weight_dtype) for sample in down_block_res_samples],
         #                           mid_block_additional_residual=mid_block_res_sample.to(dtype=weight_dtype)).sample
 
-        #         if args.snr_gamma is None:
-        #             loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+        #         # Get the target for loss depending on the prediction type
+        #         if args.prediction_type is not None:
+        #             # set prediction_type of scheduler if defined
+        #             noise_scheduler.register_to_config(prediction_type=args.prediction_type)
+        #         elif noise_scheduler.config.prediction_type == "epsilon":
+        #             target = noise
+        #         elif noise_scheduler.config.prediction_type == "v_prediction":
+        #             target = noise_scheduler.get_velocity(latents, noise, timesteps)
         #         else:
-        #             # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
-        #             # Since we predict the noise instead of x_0, the original formulation is slightly changed.
-        #             # This is discussed in Section 4.2 of the same paper.
-        #             snr = compute_snr(noise_scheduler, timesteps)
-        #             if noise_scheduler.config.prediction_type == "v_prediction":
-        #                 # Velocity objective requires that we add one to SNR values before we divide by them.
-        #                 snr = snr + 1
-        #             mse_loss_weights = (
-        #                 torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(dim=1)[0] / snr
-        #             )
+        #             raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
-        #             loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
-        #             loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
-        #             loss = loss.mean()
+        #         loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
         #         # Gather the losses across all processes for logging (if we use distributed training).
         #         avg_loss = accelerator.gather(loss.repeat(cfg.TRAIN.BATCH_SIZE)).mean()
@@ -418,6 +396,7 @@ def main():
 
         #     logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
         #     progress_bar.set_postfix(**logs)
+        #     accelerator.log(logs, step=global_step)
 
         #     if global_step >= max_train_steps:
         #         break
@@ -468,14 +447,12 @@ def main():
             del pipeline
             torch.cuda.empty_cache()
 
-    # Save the lora layers
+    # Save the model
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        unet = unet.to(torch.float32)
-        unet.save_attn_procs(args.output_dir)
-
-        save_path = os.path.join(args.output_dir, f"final-checkpoint")
-        accelerator.save_state(save_path)
+        save_path = os.path.join(args.output_dir, f"final-model")
+        controlnet = accelerator.unwrap_model(controlnet)
+        controlnet.save_pretrained(save_path)
         logger.info(f"Saved model to {save_path}")
         
     accelerator.end_training()
