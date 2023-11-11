@@ -1,0 +1,20 @@
+DATA:
+  RESOLUTION: 512
+  CENTER_CROP: True
+  RANDOM_FLIP: True
+  RANDOM_AUG: True
+  COND_IMAGES: True
+
+MODEL:
+  NAME: 'stabilityai/stable-diffusion-2-1'
+  CONTROL_NET: True
+
+TRAIN:
+  EPOCH: 100
+  BATCH_SIZE: 4
+  LR:
+    MODE: 'cosine'
+    BASE_LR : 1e-4
+
+EVAL:
+  EPOCH: 1

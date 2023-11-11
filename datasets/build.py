@@ -24,8 +24,15 @@ def build_dataloader(cfg, tokenizer):
             transforms.Normalize([0.5], [0.5]),
         ]
     )
+    cond_train_transform = transforms.Compose(
+        [
+            transforms.Resize(cfg.DATA.RESOLUTION, interpolation=transforms.InterpolationMode.BILINEAR),
+            transforms.CenterCrop(cfg.DATA.RESOLUTION),
+            transforms.ToTensor(),
+        ]
+    )
 
-    train_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, mode="train")
+    train_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=cond_train_transform, mode="train")
     test_dataset = BannerDataset(cfg.DATA, tokenizer, transform=None, mode="test")
     val_dataset = torch.utils.data.Subset(test_dataset, list(range(0, 10)))
 

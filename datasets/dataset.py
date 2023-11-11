@@ -17,7 +17,20 @@ def train_collate_fn(samples):
     pixel_values = torch.stack([sample["pixel_values"] for sample in samples])
     pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
     input_ids = torch.cat([sample["input_ids"] for sample in samples], dim=0)
-    return {"pixel_values": pixel_values, "input_ids": input_ids}
+    
+    if samples[0]["conditioning_pixel_values"] is not None:
+        conditioning_pixel_values = torch.stack([sample["conditioning_pixel_values"] for sample in samples])
+    else:
+        conditioning_pixel_values = None
+
+    captions = []
+    for sample in samples:
+        captions.append(sample["captions"])
+        
+    return {"pixel_values": pixel_values, 
+            "input_ids": input_ids, 
+            "captions":captions,
+            "conditioning_pixel_values": conditioning_pixel_values}
 
 def test_collate_fn(samples):
     captions = []
@@ -29,13 +42,15 @@ def test_collate_fn(samples):
             "paths": paths}
 
 class BannerDataset(Dataset):
-    def __init__(self, data_cfg, tokenizer, transform=None, mode='train') -> None:
+    def __init__(self, data_cfg, tokenizer, transform=None, cond_transform=None, mode='train') -> None:
         super().__init__()
         assert (mode in ["train", "test"]), "Please specify correct data mode !"
         self.data_cfg = data_cfg
         self.transform = transform
+        self.cond_transform = cond_transform
         self.tokenizer = tokenizer
         self.mode = mode
+        self.controlnet = data_cfg.COND_IMAGES
         self.data_dir = data_cfg.DATA_DIR
         self.data_csv_path = data_cfg.TRAIN_CSV_PATH if mode == "train" else data_cfg.TEST_CSV_PATH
         self.data_csv_path = os.path.join(self.data_dir, self.data_csv_path)
@@ -60,11 +75,19 @@ class BannerDataset(Dataset):
             image = default_loader(os.path.join(self.data_dir, self.mode, "images/", sample["bannerImage"]))
             if self.transform is not None:
                 image = self.transform(image)
+
+            cond_image = None
+            if self.controlnet:
+                cond_image = default_loader(os.path.join(self.data_dir, self.mode, "cond_images/", sample["bannerImage"]))
+                if self.cond_transform is not None:
+                    cond_image = self.cond_transform(cond_image)
         
             caption_ids = tokenize_caption(caption, self.tokenizer)
-        
+
             return {"pixel_values": image, 
-                    "input_ids": caption_ids}
+                    "input_ids": caption_ids,
+                    "captions": caption,
+                    "conditioning_pixel_values": cond_image}
         else:
             return {"captions": caption,
                     "paths": sample["bannerImage"]}
