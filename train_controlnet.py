@@ -203,7 +203,6 @@ def main():
     unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
-    controlnet.to(accelerator.device, dtype=weight_dtype)
 
     # Set correct lora layers
     lora_attn_procs = {}
