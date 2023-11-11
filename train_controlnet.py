@@ -19,7 +19,7 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 import diffusers
-from diffusers import AutoencoderKL, DDPMScheduler, DiffusionPipeline, UNet2DConditionModel, ControlNetModel
+from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionControlNetPipeline, UNet2DConditionModel, ControlNetModel
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.optimization import get_scheduler
@@ -450,7 +450,7 @@ def main():
                 f"Running validation..."
             )
             # create pipeline
-            pipeline = DiffusionPipeline.from_pretrained(
+            pipeline = StableDiffusionControlNetPipeline.from_pretrained(
                 cfg.MODEL.NAME,
                 unet=accelerator.unwrap_model(unet),
                 controlnet=accelerator.unwrap_model(controlnet),
