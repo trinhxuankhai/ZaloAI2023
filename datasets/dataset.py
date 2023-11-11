@@ -74,7 +74,7 @@ class BannerDataset(Dataset):
         self.mode = mode
         self.controlnet = data_cfg.COND_IMAGES
         self.data_dir = data_cfg.DATA_DIR
-        self.data_csv_path = data_cfg.TRAIN_CSV_PATH if mode == "train" else data_cfg.TEST_CSV_PATH
+        self.data_csv_path = data_cfg.TRAIN_CSV_PATH if (mode == "train" or mode == "val") else data_cfg.TEST_CSV_PATH
         self.data_csv_path = os.path.join(self.data_dir, self.data_csv_path)
         self.data = pd.read_csv(self.data_csv_path)
 
@@ -99,7 +99,6 @@ class BannerDataset(Dataset):
             cond_image = auto_canny(cond_image)
             cond_image = cond_image[:, :, None]
             cond_image = np.concatenate([cond_image, cond_image, cond_image], axis=2)
-
             if self.cond_transform is not None:
                 cond_image = self.cond_transform(cond_image)
         
