@@ -19,6 +19,11 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Trainning script")
     parser.add_argument('--config', default="configs/baseline.yaml", type=str, help='config_file')
     parser.add_argument(
+        "--inference_steps",
+        type=int,
+        default=30,
+    )
+    parser.add_argument(
         "--revision",
         type=str,
         default=None,
@@ -178,7 +183,7 @@ def main():
         for path in sample["paths"]:
             save_paths.append(os.path.join(args.output_dir, path))
 
-        images = pipeline(sample["captions"], num_inference_steps=30, generator=generator, height=536, width=1024).images
+        images = pipeline(sample["captions"], num_inference_steps=args.inference_steps, generator=generator, height=536, width=1024).images
 
         for image, save_path in zip(images, save_paths):
             image = image.resize((1024, 533))
