@@ -468,9 +468,10 @@ def main():
             images = []
             captions = []
             for sample in train_dataloader:
+                print(sample["conditioning_pixel_values"].shape)
                 with torch.autocast("cuda"):
                     images.append(
-                        pipeline(sample["captions"][0], num_inference_steps=30, generator=generator, image=sample["conditioning_pixel_values"][0]).images[0]
+                        pipeline(sample["captions"], num_inference_steps=30, generator=generator, image=sample["conditioning_pixel_values"]).images[0]
                     )
                 captions.append(sample["captions"][0])
 
