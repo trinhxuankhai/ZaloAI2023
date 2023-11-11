@@ -6,8 +6,8 @@ DATA:
   COND_IMAGES: True
 
 MODEL:
-  NAME: 'stabilityai/stable-diffusion-2-1'
-  CONTROL_NET: True
+  NAME: 'runwayml/stable-diffusion-v1-5'
+  CONTROL_NET: 'lllyasviel/sd-controlnet-canny'
 
 TRAIN:
   EPOCH: 100

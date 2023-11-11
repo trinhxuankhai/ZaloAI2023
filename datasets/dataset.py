@@ -1,11 +1,23 @@
 import os
+import cv2
 import torch
+import numpy as np
 import pandas as pd
 from PIL import Image
 from torch.utils.data import Dataset
     
 def default_loader(path):
     return Image.open(path).convert('RGB')
+
+def auto_canny(image, sigma=0.33):
+	# compute the median of the single channel pixel intensities
+	v = np.median(image)
+	# apply automatic Canny edge detection using the computed median
+	lower = int(max(0, (1.0 - sigma) * v))
+	upper = int(min(255, (1.0 + sigma) * v))
+	edged = cv2.Canny(image, lower, upper)
+	# return the edged image
+	return edged
 
 def tokenize_caption(caption, tokenizer):
     inputs = tokenizer(
@@ -30,6 +42,16 @@ def train_collate_fn(samples):
     return {"pixel_values": pixel_values, 
             "input_ids": input_ids, 
             "captions":captions,
+            "conditioning_pixel_values": conditioning_pixel_values}
+
+def val_collate_fn(samples):
+    captions = []
+    conditioning_pixel_values = []
+    for sample in samples:
+        captions.append(sample["captions"])
+        conditioning_pixel_values.append(sample["conditioning_pixel_values"])
+        
+    return {"captions": captions,
             "conditioning_pixel_values": conditioning_pixel_values}
 
 def test_collate_fn(samples):
@@ -70,23 +92,31 @@ class BannerDataset(Dataset):
         # Load caption
         caption = sample["caption"]
         
+        # Load condition image
+        cond_image = None
+        if self.controlnet:
+            cond_image = default_loader(os.path.join(self.data_dir, self.mode, "cond_images/", sample["bannerImage"]))
+            cond_image = auto_canny(cond_image)
+            cond_image = cond_image[:, :, None]
+            cond_image = np.concatenate([cond_image, cond_image, cond_image], axis=2)
+
+            if self.cond_transform is not None:
+                cond_image = self.cond_transform(cond_image)
+        
         if self.mode == "train":
             # Load image
             image = default_loader(os.path.join(self.data_dir, self.mode, "images/", sample["bannerImage"]))
             if self.transform is not None:
                 image = self.transform(image)
 
-            cond_image = None
-            if self.controlnet:
-                cond_image = default_loader(os.path.join(self.data_dir, self.mode, "cond_images/", sample["bannerImage"]))
-                if self.cond_transform is not None:
-                    cond_image = self.cond_transform(cond_image)
-        
             caption_ids = tokenize_caption(caption, self.tokenizer)
-
             return {"pixel_values": image, 
                     "input_ids": caption_ids,
                     "captions": caption,
+                    "conditioning_pixel_values": cond_image}
+        
+        elif self.mode == "val":            
+            return {"captions": caption,
                     "conditioning_pixel_values": cond_image}
         else:
             return {"captions": caption,
