@@ -95,6 +95,7 @@ class BannerDataset(Dataset):
             cond_image = auto_canny(cond_image)
             cond_image = cond_image[:, :, None]
             cond_image = np.concatenate([cond_image, cond_image, cond_image], axis=2)
+            cond_image = Image.fromarray(image)
             if self.cond_transform is not None:
                 cond_image = self.cond_transform(cond_image)
         
