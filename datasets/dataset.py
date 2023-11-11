@@ -96,6 +96,7 @@ class BannerDataset(Dataset):
         cond_image = None
         if self.controlnet:
             cond_image = default_loader(os.path.join(self.data_dir, "train", "cond_images/", sample["bannerImage"]))
+            cond_image = np.array(cond_image)
             cond_image = auto_canny(cond_image)
             cond_image = cond_image[:, :, None]
             cond_image = np.concatenate([cond_image, cond_image, cond_image], axis=2)
