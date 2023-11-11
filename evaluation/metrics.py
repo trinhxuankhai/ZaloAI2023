@@ -41,7 +41,7 @@ class ZaloMetric(Metric):
         with torch.no_grad():
             preds_feature, target_feature = self.model(preds), self.model(target)
             similarity = F.cosine_similarity(preds_feature, target_feature).mean()
-        return similarity
+        return (1 - similarity)/2
 
     def compute(self, reset=False):
         fid_acc = self.fid.compute()
