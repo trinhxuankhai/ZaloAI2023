@@ -452,7 +452,7 @@ def main():
             # create pipeline
             pipeline = StableDiffusionControlNetPipeline.from_pretrained(
                 cfg.MODEL.NAME,
-                unet=accelerator.unwrap_model(unet),
+                unet=accelerator.unwrap_model(unet).to(torch.float32),
                 controlnet=accelerator.unwrap_model(controlnet),
                 revision=args.revision,
                 torch_dtype=weight_dtype,
