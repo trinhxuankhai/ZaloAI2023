@@ -34,14 +34,9 @@ def train_collate_fn(samples):
         conditioning_pixel_values = torch.stack([sample["conditioning_pixel_values"] for sample in samples])
     else:
         conditioning_pixel_values = None
-
-    captions = []
-    for sample in samples:
-        captions.append(sample["captions"])
         
     return {"pixel_values": pixel_values, 
             "input_ids": input_ids, 
-            "captions":captions,
             "conditioning_pixel_values": conditioning_pixel_values}
 
 def val_collate_fn(samples):
@@ -111,7 +106,6 @@ class BannerDataset(Dataset):
             caption_ids = tokenize_caption(caption, self.tokenizer)
             return {"pixel_values": image, 
                     "input_ids": caption_ids,
-                    "captions": caption,
                     "conditioning_pixel_values": cond_image}
         elif self.mode == "val":            
             return {"captions": caption,
