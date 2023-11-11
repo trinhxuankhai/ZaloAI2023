@@ -95,7 +95,7 @@ class BannerDataset(Dataset):
         # Load condition image
         cond_image = None
         if self.controlnet:
-            cond_image = default_loader(os.path.join(self.data_dir, self.mode, "cond_images/", sample["bannerImage"]))
+            cond_image = default_loader(os.path.join(self.data_dir, "train", "cond_images/", sample["bannerImage"]))
             cond_image = auto_canny(cond_image)
             cond_image = cond_image[:, :, None]
             cond_image = np.concatenate([cond_image, cond_image, cond_image], axis=2)
@@ -108,13 +108,11 @@ class BannerDataset(Dataset):
             image = default_loader(os.path.join(self.data_dir, self.mode, "images/", sample["bannerImage"]))
             if self.transform is not None:
                 image = self.transform(image)
-
             caption_ids = tokenize_caption(caption, self.tokenizer)
             return {"pixel_values": image, 
                     "input_ids": caption_ids,
                     "captions": caption,
                     "conditioning_pixel_values": cond_image}
-        
         elif self.mode == "val":            
             return {"captions": caption,
                     "conditioning_pixel_values": cond_image}

@@ -253,7 +253,7 @@ def main():
     total_batch_size = cfg.TRAIN.BATCH_SIZE * accelerator.num_processes * cfg.TRAIN.GRADIENT_ACCUMULATION_STEP
 
     logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {len(train_dataloader)}")
+    logger.info(f"  Num batch samples = {len(train_dataloader)}")
     logger.info(f"  Num Epochs = {cfg.TRAIN.EPOCH}")
     logger.info(f"  Instantaneous batch size per device = {cfg.TRAIN.BATCH_SIZE}")
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
