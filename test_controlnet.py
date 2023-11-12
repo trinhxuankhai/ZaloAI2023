@@ -127,7 +127,7 @@ def main():
         for path in sample["paths"]:
             save_paths.append(os.path.join(args.output_dir, path))
 
-        images = pipeline(sample["captions"], num_inference_steps=args.inference_steps, generator=generator, height=536, width=1024).images
+        images = pipeline(sample["captions"], sample["conditioning_pixel_values"], num_inference_steps=20, generator=generator).images
 
         for image, save_path in zip(images, save_paths):
             image = image.resize((1024, 533))
