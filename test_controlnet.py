@@ -119,7 +119,7 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
 
     start = time.time()
-    for sample in test_dataloader:
+    for sample in val_dataloader:
         save_paths = []
         for path in sample["paths"]:
             save_paths.append(os.path.join(args.output_dir, path))
