@@ -133,7 +133,9 @@ def main():
         for image, save_path in zip(images, save_paths):
             image = image.resize((1024, 533))
             image.save(save_path)
+
         progress_bar.update(1)
+    
     end = time.time()
     logger.info(
         f"Total inference time: {end-start} s"
