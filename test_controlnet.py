@@ -12,6 +12,7 @@ from diffusers import AutoencoderKL, DDPMScheduler, UniPCMultistepScheduler, Sta
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from configs.default import get_default_config
+from .evaluation.metrics import ZaloMetric
 
 logger = get_logger(__name__, log_level="INFO")
 
@@ -118,6 +119,8 @@ def main():
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
 
+    
+    #metric = ZaloMetric()
     start = time.time()
     for sample in val_dataloader:
         save_paths = []

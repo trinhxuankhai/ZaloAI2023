@@ -40,14 +40,16 @@ def train_collate_fn(samples):
             "conditioning_pixel_values": conditioning_pixel_values}
 
 def val_collate_fn(samples):
+    paths = []
     captions = []
     conditioning_pixel_values = []
     for sample in samples:
         captions.append(sample["captions"])
         conditioning_pixel_values.append(sample["conditioning_pixel_values"])
-        
+        paths.append(sample["paths"])
     return {"captions": captions,
-            "conditioning_pixel_values": conditioning_pixel_values}
+            "conditioning_pixel_values": conditioning_pixel_values,
+            "paths": paths}
 
 def test_collate_fn(samples):
     captions = []
@@ -110,7 +112,8 @@ class BannerDataset(Dataset):
                     "conditioning_pixel_values": cond_image}
         elif self.mode == "val":            
             return {"captions": caption,
-                    "conditioning_pixel_values": cond_image}
+                    "conditioning_pixel_values": cond_image,
+                    "paths": sample["bannerImage"]}
         else:
             return {"captions": caption,
                     "paths": sample["bannerImage"]}
