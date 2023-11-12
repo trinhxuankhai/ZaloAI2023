@@ -30,21 +30,21 @@ class ZaloMetric(Metric):
         assert preds.shape == target.shape
 
         self.total += preds.shape[0]
-        self.psnr_acc += self.psnr(preds.type(torch.float32), target.type(torch.float32))
-        self.ssim_acc += self.ssim(preds.type(torch.float32), target.type(torch.float32))
+        self.psnr_acc += 1/(1+self.psnr(preds.type(torch.float32), target.type(torch.float32)))
+        self.ssim_acc += 1 - (self.ssim(preds.type(torch.float32), target.type(torch.float32)) + 1)/2
         self.fid.update(preds.type(torch.uint8), real=False)
         self.fid.update(target.type(torch.uint8), real=True)
-        self.cosine_acc += self.consine_similarity(preds.type(torch.float32), target.type(torch.float32))
+        self.cosine_acc += (1 - self.consine_similarity(preds.type(torch.float32), target.type(torch.float32)))/2
 
     def consine_similarity(self, preds, target):
         preds, target = self.resize(preds), self.resize(target)
         with torch.no_grad():
             preds_feature, target_feature = self.model(preds), self.model(target)
             similarity = F.cosine_similarity(preds_feature, target_feature).mean()
-        return (1 - similarity)/2
+        return similarity
 
     def compute(self, reset=False):
-        fid_acc = self.fid.compute()
+        fid_acc = 1 - 1/(1 + self.fid.compute())
         if reset:
             self.fid.reset()
         return 0.25*(self.psnr_acc + self.ssim_acc + self.cosine_acc) / self.total + fid_acc/4
