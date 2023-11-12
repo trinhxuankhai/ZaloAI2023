@@ -31,12 +31,6 @@ def parse_args():
         help="Revision of pretrained model identifier from huggingface.co/models.",
     )
     parser.add_argument(
-        "--checkpoint_dir",
-        type=str,
-        default="./checkpoints/baseline",
-        help="The output directory where the model predictions and checkpoints will be written.",
-    )
-    parser.add_argument(
         "--model_dir",
         type=str,
         default=None,
