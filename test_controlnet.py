@@ -12,7 +12,7 @@ from diffusers import AutoencoderKL, DDPMScheduler, UniPCMultistepScheduler, Sta
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from configs.default import get_default_config
-from .evaluation.metrics import ZaloMetric
+#from .evaluation.metrics import ZaloMetric
 
 logger = get_logger(__name__, log_level="INFO")
 
