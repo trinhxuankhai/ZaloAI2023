@@ -132,7 +132,7 @@ class BannerDataset(Dataset):
         
         if self.mode == "train" or self.mode == "val":
             # Load image
-            image = default_loader(os.path.join(self.data_dir, self.mode, "images/", sample["bannerImage"]))
+            image = default_loader(os.path.join(self.data_dir, "train", "images/", sample["bannerImage"]))
             if self.transform is not None:
                 image = self.transform(image)
             caption_ids = tokenize_caption(caption, self.tokenizer)
