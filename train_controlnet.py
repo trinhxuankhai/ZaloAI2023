@@ -204,13 +204,34 @@ def main():
     vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
 
+    # Set correct lora layers
+    lora_attn_procs = {}
+    for name in unet.attn_processors.keys():
+        cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
+        if name.startswith("mid_block"):
+            hidden_size = unet.config.block_out_channels[-1]
+        elif name.startswith("up_blocks"):
+            block_id = int(name[len("up_blocks.")])
+            hidden_size = list(reversed(unet.config.block_out_channels))[block_id]
+        elif name.startswith("down_blocks"):
+            block_id = int(name[len("down_blocks.")])
+            hidden_size = unet.config.block_out_channels[block_id]
+
+        lora_attn_procs[name] = LoRAAttnProcessor(
+            hidden_size=hidden_size,
+            cross_attention_dim=cross_attention_dim,
+            rank=cfg.MODEL.RANK,
+        )
+    unet.set_attn_processor(lora_attn_procs)
+    lora_layers = AttnProcsLayers(unet.attn_processors)
+
     if cfg.TRAIN.LR.SCALE_LR:
         cfg.TRAIN.LR.BASE_LR = (
             cfg.TRAIN.LR.BASE_LR * cfg.TRAIN.GRADIENT_ACCUMULATION_STEP * cfg.TRAIN.BATCH_SIZE * accelerator.num_processes
         )
 
     optimizer_cls = torch.optim.AdamW
-    params_to_optimize = controlnet.parameters()
+    params_to_optimize = list(controlnet.parameters()) + list(lora_layers.parameters())
     optimizer = optimizer_cls(
         params_to_optimize,
         lr=cfg.TRAIN.LR.BASE_LR,
@@ -234,8 +255,8 @@ def main():
     )
 
     # Prepare everything with our `accelerator`.
-    controlnet, optimizer, train_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
-        controlnet, optimizer, train_dataloader, val_dataloader, lr_scheduler
+    lora_layers, controlnet, optimizer, train_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
+        lora_layers, controlnet, optimizer, train_dataloader, val_dataloader, lr_scheduler
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -356,7 +377,7 @@ def main():
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    params_to_clip = controlnet.parameters()
+                    params_to_clip = list(controlnet.parameters()) + list(lora_layers.parameters())
                     accelerator.clip_grad_norm_(params_to_clip, cfg.TRAIN.MAX_NORM)
                 optimizer.step()
                 lr_scheduler.step()
@@ -412,7 +433,7 @@ def main():
                 vae=vae,
                 text_encoder=text_encoder,
                 tokenizer=tokenizer,
-                unet=unet,
+                unet=accelerator.unwrap_model(unet),
                 controlnet=accelerator.unwrap_model(controlnet),
                 revision=args.revision,
                 torch_dtype=weight_dtype,
