@@ -25,6 +25,11 @@ def parse_args():
         default=20,
     )
     parser.add_argument(
+        "--negative_prompt",
+        type=str,
+        default=None
+    )
+    parser.add_argument(
         "--revision",
         type=str,
         default=None,
@@ -130,7 +135,7 @@ def main():
             save_cond_paths.append(os.path.join(args.output_dir, "cond_images", path))
             
         with torch.autocast("cuda"):
-            images = pipeline(sample["captions"], sample["conditioning_pixel_values"], num_inference_steps=20, generator=generator).images
+            images = pipeline(sample["captions"], sample["conditioning_pixel_values"], num_inference_steps=20, generator=generator, negative_prompt=args.negative_prompt).images
 
         for i, (image, save_path) in enumerate(zip(images, save_paths)):
             image = image.resize((1024, 533))

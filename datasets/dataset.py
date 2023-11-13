@@ -59,7 +59,7 @@ def create_cond_images(text, unicode_font):
     draw = ImageDraw.Draw(cond_image)
 
     # Top left
-    if random.random() > 0.5:
+    if random.random() > 0.5 and len(nouns) > 0:
         noun = random.choice(nouns)
         nouns.remove(noun)
         noun_x, noun_y = unicode_font.getsize(noun)
@@ -67,7 +67,7 @@ def create_cond_images(text, unicode_font):
         draw.text((pos_x, pos_y), noun, font=unicode_font, fill=font_color)
 
     # Top right
-    if random.random() > 0.5:
+    if random.random() > 0.5 and len(nouns) > 0:
         noun = random.choice(nouns)
         nouns.remove(noun)
         noun_x, noun_y = unicode_font.getsize(noun)
@@ -75,7 +75,7 @@ def create_cond_images(text, unicode_font):
         draw.text((pos_x, pos_y), noun, font=unicode_font, fill=font_color)
 
     # Bottom left
-    if random.random() > 0.5:
+    if random.random() > 0.5 and len(nouns) > 0:
         noun = random.choice(nouns)
         nouns.remove(noun)
         noun_x, noun_y = unicode_font.getsize(noun)
@@ -83,7 +83,7 @@ def create_cond_images(text, unicode_font):
         draw.text((pos_x, pos_y), noun, font=unicode_font, fill=font_color)
 
     # Bottom right
-    if random.random() > 0.5:
+    if random.random() > 0.5 and len(nouns) > 0:
         noun = random.choice(nouns)
         nouns.remove(noun)
         noun_x, noun_y = unicode_font.getsize(noun)
