@@ -1,6 +1,6 @@
 import torch
 from torchvision import transforms
-from .dataset import BannerDataset, train_collate_fn, test_collate_fn, val_collate_fn
+from .dataset import BannerDataset, train_collate_fn, test_collate_fn
 from .random_aug import RandAugment
 
 def build_dataloader(cfg, tokenizer):
@@ -23,9 +23,9 @@ def build_dataloader(cfg, tokenizer):
     )
 
     train_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=cond_train_transform, mode="train")
-    test_dataset = BannerDataset(cfg.DATA, tokenizer, transform=None, mode="test")
+    test_dataset = BannerDataset(cfg.DATA, tokenizer, transform=None, cond_transform=None, mode="test")
     val_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=None, mode="val")
-    #val_dataset = torch.utils.data.Subset(val_dataset, list(range(0, 10)))
+    val_dataset = torch.utils.data.Subset(val_dataset, list(range(0, 10)))
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
@@ -46,7 +46,7 @@ def build_dataloader(cfg, tokenizer):
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
         shuffle=False,
-        collate_fn=val_collate_fn,
+        collate_fn=test_collate_fn,
         batch_size=1,
         num_workers=cfg.TRAIN.NUM_WORKERS
     )

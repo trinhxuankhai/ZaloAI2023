@@ -118,21 +118,24 @@ def main():
     # create output folder
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
-
-    
-    #metric = ZaloMetric()
+        os.makedirs(os.path.join(args.output_dir, "images"), exist_ok=True)
+        os.makedirs(os.path.join(args.output_dir, "cond_images"), exist_ok=True)
+        
     start = time.time()
-    for sample in val_dataloader:
+    for sample in test_dataloader:
         save_paths = []
+        save_cond_paths = []
         for path in sample["paths"]:
-            save_paths.append(os.path.join(args.output_dir, path))
-
+            save_paths.append(os.path.join(args.output_dir, "images", path))
+            save_cond_paths.append(os.path.join(args.output_dir, "cond_images", path))
+            
         with torch.autocast("cuda"):
             images = pipeline(sample["captions"], sample["conditioning_pixel_values"], num_inference_steps=20, generator=generator).images
 
-        for image, save_path in zip(images, save_paths):
+        for i, (image, save_path) in enumerate(zip(images, save_paths)):
             image = image.resize((1024, 533))
             image.save(save_path)
+            sample["conditioning_pixel_values"][i].save(save_cond_paths[i])
 
         progress_bar.update(1)
     

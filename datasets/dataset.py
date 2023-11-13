@@ -1,23 +1,14 @@
 import os
-import cv2
+import random
 import torch
 import numpy as np
 import pandas as pd
-from PIL import Image
+from underthesea import pos_tag
 from torch.utils.data import Dataset
+from PIL import Image, ImageFont, ImageDraw
     
 def default_loader(path):
     return Image.open(path).convert('RGB')
-
-def auto_canny(image, sigma=0.33):
-	# compute the median of the single channel pixel intensities
-	v = np.median(image)
-	# apply automatic Canny edge detection using the computed median
-	lower = int(max(0, (1.0 - sigma) * v))
-	upper = int(min(255, (1.0 + sigma) * v))
-	edged = cv2.Canny(image, lower, upper)
-	# return the edged image
-	return edged
 
 def tokenize_caption(caption, tokenizer):
     inputs = tokenizer(
@@ -39,7 +30,7 @@ def train_collate_fn(samples):
             "input_ids": input_ids, 
             "conditioning_pixel_values": conditioning_pixel_values}
 
-def val_collate_fn(samples):
+def test_collate_fn(samples):
     paths = []
     captions = []
     conditioning_pixel_values = []
@@ -47,18 +38,59 @@ def val_collate_fn(samples):
         captions.append(sample["captions"])
         conditioning_pixel_values.append(sample["conditioning_pixel_values"])
         paths.append(sample["paths"])
+
     return {"captions": captions,
             "conditioning_pixel_values": conditioning_pixel_values,
             "paths": paths}
 
-def test_collate_fn(samples):
-    captions = []
-    paths = []
-    for sample in samples:
-        captions.append(sample["captions"])
-        paths.append(sample["paths"])
-    return {"captions": captions,
-            "paths": paths}
+def create_cond_images(text, unicode_font):
+    width=1024
+    height=533
+    back_ground_color=(0,0,0)
+    font_color=(255,255,255)
+    nouns = []
+    for tag in pos_tag(text):
+        if tag[1] == 'N':
+            nouns.append(tag[0])
+    
+    margin_x = int(0.1*width)
+    margin_y = int(0.1*height)
+    cond_image = Image.new("RGB", (width,height), back_ground_color)
+    draw = ImageDraw.Draw(cond_image)
+
+    # Top left
+    if random.random() > 0.5:
+        noun = random.choice(nouns)
+        nouns.remove(noun)
+        noun_x, noun_y = unicode_font.getsize(noun)
+        pos_x, pos_y = random.randrange(margin_x, int(0.5*width-noun_x)), random.randrange(margin_y, int(0.5*height-noun_y))
+        draw.text((pos_x, pos_y), noun, font=unicode_font, fill=font_color)
+
+    # Top right
+    if random.random() > 0.5:
+        noun = random.choice(nouns)
+        nouns.remove(noun)
+        noun_x, noun_y = unicode_font.getsize(noun)
+        pos_x, pos_y = random.randrange(int(0.5*width), int(width-margin_x-noun_x)), random.randrange(margin_y, int(0.5*height-noun_y))
+        draw.text((pos_x, pos_y), noun, font=unicode_font, fill=font_color)
+
+    # Bottom left
+    if random.random() > 0.5:
+        noun = random.choice(nouns)
+        nouns.remove(noun)
+        noun_x, noun_y = unicode_font.getsize(noun)
+        pos_x, pos_y = random.randrange(margin_x, int(0.5*width-noun_x)), random.randrange(int(0.5*height), int(height-margin_y-noun_y))
+        draw.text((pos_x, pos_y), noun, font=unicode_font, fill=font_color)
+
+    # Bottom right
+    if random.random() > 0.5:
+        noun = random.choice(nouns)
+        nouns.remove(noun)
+        noun_x, noun_y = unicode_font.getsize(noun)
+        pos_x, pos_y = random.randrange(int(0.5*width), int(width-margin_x-noun_x)), random.randrange(int(0.5*height), int(height-margin_y-noun_y))
+        draw.text((pos_x, pos_y), noun, font=unicode_font, fill=font_color)
+    
+    return cond_image
 
 class BannerDataset(Dataset):
     def __init__(self, data_cfg, tokenizer, transform=None, cond_transform=None, mode='train') -> None:
@@ -71,9 +103,17 @@ class BannerDataset(Dataset):
         self.mode = mode
         self.controlnet = data_cfg.COND_IMAGES
         self.data_dir = data_cfg.DATA_DIR
+
+        # Load data
         self.data_csv_path = data_cfg.TRAIN_CSV_PATH if (mode == "train" or mode == "val") else data_cfg.TEST_CSV_PATH
-        self.data_csv_path = os.path.join(self.data_dir, self.data_csv_path)
-        self.data = pd.read_csv(self.data_csv_path)
+        self.data = pd.read_csv(os.path.join(self.data_dir, self.data_csv_path))
+
+        # Load VN data
+        self.data_csv_path_vn = data_cfg.TRAIN_CSV_PATH_VN if (mode == "train" or mode == "val") else data_cfg.TEST_CSV_PATH_VN
+        self.data_vn = pd.read_csv(os.path.join(self.data_dir, self.data_csv_path_vn))
+
+        # Load font
+        self.unicode_font = ImageFont.truetype(data_cfg.FONT, data_cfg.FONT_SIZE)
 
     def __len__(self):
         return len(self.data)
@@ -88,32 +128,32 @@ class BannerDataset(Dataset):
 
         # Load caption
         caption = sample["caption"]
+        caption_vn = self.data_vn.iloc[index]["caption"]
         
-        # Load condition image
-        cond_image = None
-        if self.controlnet:
-            cond_image = default_loader(os.path.join(self.data_dir, "train", "cond_images/", sample["bannerImage"]))
-            # cond_image = np.array(cond_image)
-            # cond_image = auto_canny(cond_image)
-            # cond_image = cond_image[:, :, None]
-            # cond_image = np.concatenate([cond_image, cond_image, cond_image], axis=2)
-            # cond_image = Image.fromarray(cond_image)
-            if self.cond_transform is not None:
-                cond_image = self.cond_transform(cond_image)
-        
-        if self.mode == "train":
+        if self.mode == "train" or self.mode == "val":
             # Load image
             image = default_loader(os.path.join(self.data_dir, self.mode, "images/", sample["bannerImage"]))
             if self.transform is not None:
                 image = self.transform(image)
             caption_ids = tokenize_caption(caption, self.tokenizer)
-            return {"pixel_values": image, 
-                    "input_ids": caption_ids,
-                    "conditioning_pixel_values": cond_image}
-        elif self.mode == "val":            
+
+            # Load condition image
+            cond_image = None
+            if self.controlnet:
+                cond_image = default_loader(os.path.join(self.data_dir, "train", "cond_images/", sample["bannerImage"]))
+                if self.cond_transform is not None:
+                    cond_image = self.cond_transform(cond_image)
+
+            if self.mode == "train":
+                return {"pixel_values": image, 
+                        "input_ids": caption_ids,
+                        "conditioning_pixel_values": cond_image}
+            else:            
+                return {"captions": caption,
+                        "conditioning_pixel_values": cond_image,
+                        "paths": sample["bannerImage"]}
+        else:
+            cond_image = create_cond_images(caption_vn, self.unicode_font)
             return {"captions": caption,
                     "conditioning_pixel_values": cond_image,
-                    "paths": sample["bannerImage"]}
-        else:
-            return {"captions": caption,
                     "paths": sample["bannerImage"]}
