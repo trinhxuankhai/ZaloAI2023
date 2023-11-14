@@ -77,6 +77,33 @@ def main():
     tokenizer = CLIPTokenizer.from_pretrained(
         cfg.MODEL.NAME, subfolder="tokenizer", revision=args.revision
     )
+    unet = UNet2DConditionModel.from_pretrained(
+        cfg.MODEL.NAME, subfolder="unet", revision=args.revision
+    )
+
+    # freeze parameters of models to save more memory
+    unet.requires_grad_(False)
+    # Set correct lora layers
+    lora_attn_procs = {}
+    for name in unet.attn_processors.keys():
+        cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
+        if name.startswith("mid_block"):
+            hidden_size = unet.config.block_out_channels[-1]
+        elif name.startswith("up_blocks"):
+            block_id = int(name[len("up_blocks.")])
+            hidden_size = list(reversed(unet.config.block_out_channels))[block_id]
+        elif name.startswith("down_blocks"):
+            block_id = int(name[len("down_blocks.")])
+            hidden_size = unet.config.block_out_channels[block_id]
+
+        lora_attn_procs[name] = LoRAAttnProcessor(
+            hidden_size=hidden_size,
+            cross_attention_dim=cross_attention_dim,
+            rank=cfg.MODEL.RANK,
+        )
+
+    unet.set_attn_processor(lora_attn_procs)
+    lora_layers = AttnProcsLayers(unet.attn_processors)
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
@@ -90,8 +117,8 @@ def main():
     _, test_dataloader, val_dataloader = build_dataloader(cfg, tokenizer)
 
     # Prepare everything with our `accelerator`.
-    controlnet, val_dataloader = accelerator.prepare(
-        controlnet, val_dataloader
+    lora_layers, controlnet, val_dataloader = accelerator.prepare(
+        lora_layers, controlnet, val_dataloader
     )    
     
     progress_bar = tqdm(
@@ -107,6 +134,7 @@ def main():
     # create pipeline
     pipeline = StableDiffusionControlNetPipeline.from_pretrained(
         cfg.MODEL.NAME,
+        unet=accelerator.unwrap_model(unet),
         controlnet=accelerator.unwrap_model(controlnet),
         revision=args.revision,
         torch_dtype=weight_dtype,
