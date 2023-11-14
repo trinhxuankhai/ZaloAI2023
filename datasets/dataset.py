@@ -21,26 +21,27 @@ def train_collate_fn(samples):
     pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
     input_ids = torch.cat([sample["input_ids"] for sample in samples], dim=0)
     
-    if samples[0]["conditioning_pixel_values"] is not None:
-        conditioning_pixel_values = torch.stack([sample["conditioning_pixel_values"] for sample in samples])
-    else:
-        conditioning_pixel_values = None
+    # if samples[0]["conditioning_pixel_values"] is not None:
+    #     conditioning_pixel_values = torch.stack([sample["conditioning_pixel_values"] for sample in samples])
+    # else:
+    #     conditioning_pixel_values = None
         
     return {"pixel_values": pixel_values, 
             "input_ids": input_ids, 
-            "conditioning_pixel_values": conditioning_pixel_values}
+            # "conditioning_pixel_values": conditioning_pixel_values
+            }
 
 def test_collate_fn(samples):
     paths = []
     captions = []
-    conditioning_pixel_values = []
+    # conditioning_pixel_values = []
     for sample in samples:
         captions.append(sample["captions"])
-        conditioning_pixel_values.append(sample["conditioning_pixel_values"])
+        # conditioning_pixel_values.append(sample["conditioning_pixel_values"])
         paths.append(sample["paths"])
 
     return {"captions": captions,
-            "conditioning_pixel_values": conditioning_pixel_values,
+            # "conditioning_pixel_values": conditioning_pixel_values,
             "paths": paths}
 
 def create_cond_images(text, unicode_font):
@@ -108,12 +109,12 @@ class BannerDataset(Dataset):
         self.data_csv_path = data_cfg.TRAIN_CSV_PATH if (mode == "train" or mode == "val") else data_cfg.TEST_CSV_PATH
         self.data = pd.read_csv(os.path.join(self.data_dir, self.data_csv_path))
 
-        # Load VN data
-        self.data_csv_path_vn = data_cfg.TRAIN_CSV_PATH_VN if (mode == "train" or mode == "val") else data_cfg.TEST_CSV_PATH_VN
-        self.data_vn = pd.read_csv(os.path.join(self.data_dir, self.data_csv_path_vn))
+        # # Load VN data
+        # self.data_csv_path_vn = data_cfg.TRAIN_CSV_PATH_VN if (mode == "train" or mode == "val") else data_cfg.TEST_CSV_PATH_VN
+        # self.data_vn = pd.read_csv(os.path.join(self.data_dir, self.data_csv_path_vn))
 
-        # Load font
-        self.unicode_font = ImageFont.truetype(data_cfg.FONT, data_cfg.FONT_SIZE)
+        # # Load font
+        # self.unicode_font = ImageFont.truetype(data_cfg.FONT, data_cfg.FONT_SIZE)
 
     def __len__(self):
         return len(self.data)
@@ -127,8 +128,8 @@ class BannerDataset(Dataset):
         sample = self.data.iloc[index]
 
         # Load caption
-        caption = sample["caption"]
-        caption_vn = self.data_vn.iloc[index]["caption"]
+        caption = sample["description"]
+        # caption_vn = self.data_vn.iloc[index]["caption"]
         
         if self.mode == "train" or self.mode == "val":
             # Load image
@@ -137,23 +138,24 @@ class BannerDataset(Dataset):
                 image = self.transform(image)
             caption_ids = tokenize_caption(caption, self.tokenizer)
 
-            # Load condition image
-            cond_image = None
-            if self.controlnet:
-                cond_image = default_loader(os.path.join(self.data_dir, "train", "cond_images/", sample["bannerImage"]))
-                if self.cond_transform is not None:
-                    cond_image = self.cond_transform(cond_image)
+            # # Load condition image
+            # cond_image = None
+            # if self.controlnet:
+            #     cond_image = default_loader(os.path.join(self.data_dir, "train", "cond_images/", sample["bannerImage"]))
+            #     if self.cond_transform is not None:
+            #         cond_image = self.cond_transform(cond_image)
 
             if self.mode == "train":
                 return {"pixel_values": image, 
                         "input_ids": caption_ids,
-                        "conditioning_pixel_values": cond_image}
+                        # "conditioning_pixel_values": cond_image
+                        }
             else:            
                 return {"captions": caption,
-                        "conditioning_pixel_values": cond_image,
+                        # "conditioning_pixel_values": cond_image,
                         "paths": sample["bannerImage"]}
         else:
-            cond_image = create_cond_images(caption_vn, self.unicode_font)
+            # cond_image = create_cond_images(caption_vn, self.unicode_font)
             return {"captions": caption,
-                    "conditioning_pixel_values": cond_image,
+                    # "conditioning_pixel_values": cond_image,
                     "paths": sample["bannerImage"]}
