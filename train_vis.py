@@ -232,7 +232,7 @@ def main():
     optimizer_cls = torch.optim.AdamW
 
     optimizer = optimizer_cls(
-        list(lora_layers.parameters()) + list(vae.parameters()),
+        list(lora_layers.parameters()),
         lr=cfg.TRAIN.LR.BASE_LR,
         betas=cfg.TRAIN.OPTIMIZER.BETAS,
         weight_decay=cfg.TRAIN.OPTIMIZER.WEIGHT_DECAY,
