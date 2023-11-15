@@ -163,7 +163,7 @@ def main():
             save_cond_paths.append(os.path.join(args.output_dir, "cond_images", path))
             
         with torch.autocast("cuda"):
-            images = pipeline(sample["captions"], sample["conditioning_pixel_values"], num_inference_steps=20, generator=generator).images
+            images = pipeline(sample["captions"], sample["conditioning_pixel_values"], num_inference_steps=30, generator=generator).images
 
         for i, (image, save_path) in enumerate(zip(images, save_paths)):
             image = image.resize((1024, 533))
