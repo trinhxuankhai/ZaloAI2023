@@ -173,7 +173,7 @@ def main():
 
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
-    #vae.requires_grad_(False)
+    vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
@@ -232,7 +232,7 @@ def main():
     optimizer_cls = torch.optim.AdamW
 
     optimizer = optimizer_cls(
-        list(lora_layers.parameters()),
+        list(lora_layers.parameters()) + list(vae.parameters()),
         lr=cfg.TRAIN.LR.BASE_LR,
         betas=cfg.TRAIN.OPTIMIZER.BETAS,
         weight_decay=cfg.TRAIN.OPTIMIZER.WEIGHT_DECAY,
