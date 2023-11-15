@@ -319,6 +319,7 @@ def main():
 
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
         unet.train()
+        vae.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
