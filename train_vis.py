@@ -316,8 +316,8 @@ def main():
         # Only show the progress bar once on each machine.
         disable=not accelerator.is_local_main_process,
     )
-    scaler = torch.cuda.amp.GradScaler()
 
+    scaler = torch.cuda.amp.GradScaler()
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
         unet.train()
         train_loss = 0.0
@@ -325,7 +325,7 @@ def main():
             with accelerator.accumulate(unet):
                 with torch.cuda.amp.autocast():
                     # Convert images to latent space
-                    latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
+                    latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
                     latents = latents * vae.config.scaling_factor
 
                     # Sample noise that we'll add to the latents
