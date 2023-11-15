@@ -287,7 +287,6 @@ def main():
             with accelerator.accumulate(unet):
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(weight_dtype)).latent_dist.sample()
-                latents = latents.to(weight_dtype)
                 latents = latents * vae.config.scaling_factor
 
                 # Sample noise that we'll add to the latents
@@ -423,12 +422,13 @@ def main():
             images = []
             captions = []
             for sample in val_dataloader:
-                images.append(
-                    pipeline(sample["captions"][0], 
-                             generator=generator, 
-                             num_inference_steps=30, 
-                             guidance_scale=5).images[0]
-                )
+                with torch.autocast("cuda"):
+                    images.append(
+                        pipeline(sample["captions"][0], 
+                                generator=generator, 
+                                num_inference_steps=30, 
+                                guidance_scale=5).images[0]
+                    )
                 captions.append(sample["captions"][0])
 
             for tracker in accelerator.trackers:
