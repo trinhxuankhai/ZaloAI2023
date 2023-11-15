@@ -186,7 +186,7 @@ def main():
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
-    vae.to(accelerator.device, dtype=torch.float32)
+    vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
 
     # now we will add new LoRA weights to the attention layers
@@ -316,6 +316,7 @@ def main():
         # Only show the progress bar once on each machine.
         disable=not accelerator.is_local_main_process,
     )
+    scaler = torch.cuda.amp.GradScaler()
 
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
         unet.train()
@@ -323,7 +324,7 @@ def main():
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
                 # Convert images to latent space
-                latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
+                latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
 
                 # Sample noise that we'll add to the latents
@@ -384,11 +385,14 @@ def main():
                 train_loss += avg_loss.item() / cfg.TRAIN.GRADIENT_ACCUMULATION_STEP
 
                 # Backpropagate
-                accelerator.backward(loss)
+                accelerator.backward(scaler.scale(loss))
                 if accelerator.sync_gradients:
                     params_to_clip = list(lora_layers.parameters()) + list(vae.parameters())
+                    scaler.unscale_(optimizer)
                     accelerator.clip_grad_norm_(params_to_clip, cfg.TRAIN.MAX_NORM)
-                optimizer.step()
+                
+                scaler.step(optimizer)
+                scaler.update()
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
