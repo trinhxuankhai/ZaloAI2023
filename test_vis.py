@@ -8,7 +8,7 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from datasets.build import build_dataloader
 from transformers import CLIPTokenizer
-from diffusers import DiffusionPipeline, UNet2DConditionModel, AutoencoderKL, EulerAncestralDiscreteScheduler
+from diffusers import DiffusionPipeline, UNet2DConditionModel, AutoencoderKL, EulerAncestralDiscreteScheduler, DPMSolverMultistepScheduler
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from configs.default import get_default_config
@@ -169,7 +169,10 @@ def main():
         revision=args.revision,
         torch_dtype=weight_dtype,
     )
-    pipeline.scheduler = EulerAncestralDiscreteScheduler(
+    #pipeline.scheduler = EulerAncestralDiscreteScheduler(
+    #    beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
+    #)
+    pipeline.scheduler = DPMSolverMultistepScheduler(
         beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
     )
     pipeline = pipeline.to(accelerator.device)
@@ -189,8 +192,16 @@ def main():
         save_paths = []
         for path in sample["paths"]:
             save_paths.append(os.path.join(args.output_dir, path))
+        
+        prefix = "Create an advertising banner about "
+        input_captions = []
+        for caption in sample["captions"]:
+            input_captions.append(prefix + caption)
 
-        images = pipeline(sample["captions"], num_inference_steps=args.inference_steps, generator=generator, height=536, width=1024).images
+        images = pipeline(sample["captions"], 
+                          num_inference_steps=args.inference_steps,
+                          guidance_scale=7,
+                          generator=generator, height=536, width=1024).images
 
         for image, save_path in zip(images, save_paths):
             image = image.resize((1024, 533))
