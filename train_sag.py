@@ -493,7 +493,11 @@ def main():
                             "validation": [
                                 wandb.Image(image, caption=caption)
                                 for i, (image, caption) in enumerate(zip(images, captions))
-                            ],
+                            ]
+                        }
+                    )
+                    tracker.log(
+                        {
                             "validation_sag": [
                                 wandb.Image(image, caption=caption)
                                 for i, (image, caption) in enumerate(zip(images_sag, captions))
