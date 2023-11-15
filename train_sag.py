@@ -491,11 +491,11 @@ def main():
                     tracker.log(
                         {
                             "validation": [
-                                wandb.Image(image, caption)
+                                wandb.Image(image, caption=caption)
                                 for i, (image, caption) in enumerate(zip(images, captions))
                             ],
                             "validation_sag": [
-                                wandb.Image(image, caption)
+                                wandb.Image(image, caption=caption)
                                 for i, (image, caption) in enumerate(zip(images_sag, captions))
                             ]
                         }
