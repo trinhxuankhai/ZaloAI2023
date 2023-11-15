@@ -5,21 +5,26 @@ import math
 import os
 import shutil
 from pathlib import Path
+from tqdm.auto import tqdm
 
-from datasets.build import build_dataloader
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
+from datasets.build import build_dataloader
+
 import transformers
-from accelerate import Accelerator
-from accelerate.logging import get_logger
-from accelerate.utils import ProjectConfiguration, set_seed
-from packaging import version
-from tqdm.auto import tqdm
+from transformers.utils import ContextManagers
 from transformers import CLIPTextModel, CLIPTokenizer
 
+import accelerate
+from accelerate import Accelerator
+from accelerate.logging import get_logger
+from accelerate.state import AcceleratorState
+from accelerate.utils import ProjectConfiguration, set_seed
+from packaging import version
+
 import diffusers
-from diffusers import AutoencoderKL, DDPMScheduler, DiffusionPipeline, UNet2DConditionModel, EulerAncestralDiscreteScheduler
+from diffusers import AutoencoderKL, DDPMScheduler, DiffusionPipeline, UNet2DConditionModel
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.optimization import get_scheduler
@@ -163,17 +168,30 @@ def main():
     tokenizer = CLIPTokenizer.from_pretrained(
         cfg.MODEL.NAME, subfolder="tokenizer", revision=args.revision
     )
-    text_encoder = CLIPTextModel.from_pretrained(
-        cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
-    )
-    vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)
+
+    def deepspeed_zero_init_disabled_context_manager():
+        """
+        returns either a context list that includes one that will disable zero.Init or an empty context list
+        """
+        deepspeed_plugin = AcceleratorState().deepspeed_plugin if accelerate.state.is_initialized() else None
+        if deepspeed_plugin is None:
+            return []
+
+        return [deepspeed_plugin.zero3_init_context_manager(enable=False)]
+    
+    with ContextManagers(deepspeed_zero_init_disabled_context_manager()):
+        text_encoder = CLIPTextModel.from_pretrained(
+            cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
+        )
+        vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)
+
     unet = UNet2DConditionModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="unet", revision=args.revision
     )
 
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
-    #vae.requires_grad_(False)
+    vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
@@ -186,7 +204,7 @@ def main():
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
-    #vae.to(accelerator.device, dtype=weight_dtype)
+    vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
 
     # now we will add new LoRA weights to the attention layers
@@ -222,6 +240,20 @@ def main():
         )
 
     unet.set_attn_processor(lora_attn_procs)
+
+    if cfg.MODEL.XFORMERS:
+        if is_xformers_available():
+            import xformers
+
+            xformers_version = version.parse(xformers.__version__)
+            if xformers_version == version.parse("0.0.16"):
+                logger.warn(
+                    "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
+                )
+            unet.enable_xformers_memory_efficient_attention()
+        else:
+            raise ValueError("xformers is not available. Make sure it is installed correctly")
+
     lora_layers = AttnProcsLayers(unet.attn_processors)
 
     if cfg.TRAIN.LR.SCALE_LR:
@@ -229,10 +261,20 @@ def main():
             cfg.TRAIN.LR.BASE_LR * cfg.TRAIN.GRADIENT_ACCUMULATION_STEP * cfg.TRAIN.BATCH_SIZE * accelerator.num_processes
         )
 
+    # Initialize the optimizer
+    # if args.use_8bit_adam:
+    #     try:
+    #         import bitsandbytes as bnb
+    #     except ImportError:
+    #         raise ImportError(
+    #             "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
+    #         )
+
+    #     optimizer_cls = bnb.optim.AdamW8bit
     optimizer_cls = torch.optim.AdamW
 
     optimizer = optimizer_cls(
-        list(lora_layers.parameters()) + list(vae.parameters()),
+        lora_layers.parameters(),
         lr=cfg.TRAIN.LR.BASE_LR,
         betas=cfg.TRAIN.OPTIMIZER.BETAS,
         weight_decay=cfg.TRAIN.OPTIMIZER.WEIGHT_DECAY,
@@ -386,7 +428,7 @@ def main():
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    params_to_clip = list(lora_layers.parameters()) + list(vae.parameters())
+                    params_to_clip = lora_layers.parameters()
                     accelerator.clip_grad_norm_(params_to_clip, cfg.TRAIN.MAX_NORM)
                 optimizer.step()
                 lr_scheduler.step()
@@ -438,15 +480,9 @@ def main():
             # create pipeline
             pipeline = DiffusionPipeline.from_pretrained(
                 cfg.MODEL.NAME,
-                vae=vae,
-                text_encoder=text_encoder,
-                tokenizer=tokenizer,
                 unet=accelerator.unwrap_model(unet),
                 revision=args.revision,
                 torch_dtype=weight_dtype,
-            )
-            pipeline.scheduler = EulerAncestralDiscreteScheduler(
-                beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
             )
             pipeline = pipeline.to(accelerator.device)
             pipeline.set_progress_bar_config(disable=True)
@@ -460,10 +496,7 @@ def main():
             captions = []
             for sample in val_dataloader:
                 images.append(
-                    pipeline(sample["captions"][0], 
-                             generator=generator, 
-                             num_inference_steps=30, 
-                             guidance_scale=5).images[0]
+                    pipeline(sample["captions"][0], num_inference_steps=30, generator=generator).images[0]
                 )
                 captions.append(sample["captions"][0])
 
@@ -483,6 +516,9 @@ def main():
     # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
+        unet = unet.to(torch.float32)
+        unet.save_attn_procs(args.output_dir)
+
         save_path = os.path.join(args.output_dir, f"final-checkpoint")
         accelerator.save_state(save_path)
         logger.info(f"Saved model to {save_path}")
