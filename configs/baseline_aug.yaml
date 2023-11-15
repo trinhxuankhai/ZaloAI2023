@@ -1,5 +1,5 @@
 DATA:
-  RESOLUTION: 512
+  RESOLUTION: 768
   CENTER_CROP: True
   RANDOM_FLIP: True
   RANDOM_AUG: True
@@ -8,11 +8,11 @@ MODEL:
   NAME: 'stabilityai/stable-diffusion-2-1'
 
 TRAIN:
-  EPOCH: 100
+  EPOCH: 50
   BATCH_SIZE: 4
   LR:
     MODE: 'cosine'
-    BASE_LR : 1e-4
+    BASE_LR : 1e-5
 
 EVAL:
   EPOCH: 1
