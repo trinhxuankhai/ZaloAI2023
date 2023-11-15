@@ -29,6 +29,8 @@ _C.MODEL.XFORMERS = False # Whether or not to use xformers for memory efficient.
 _C.MODEL.NOISE_OFFSET = 0 # https://www.crosslabs.org//blog/diffusion-with-offset-noise
 _C.MODEL.RANK = 4 # Lora rank.
 _C.MODEL.CONTROL_NET = None
+_C.MODEL.VAE = None
+
 
 # Training configurations
 _C.TRAIN = CN()
