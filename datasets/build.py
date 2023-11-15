@@ -24,8 +24,8 @@ def build_dataloader(cfg, tokenizer):
 
     train_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=cond_train_transform, mode="train")
     test_dataset = BannerDataset(cfg.DATA, tokenizer, transform=None, cond_transform=None, mode="test")
-    val_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=None, mode="val")
-    val_dataset = torch.utils.data.Subset(val_dataset, list(range(0, 10)))
+    #val_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=None, mode="val")
+    val_dataset = torch.utils.data.Subset(test_dataset, list(range(265, 275)))
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
