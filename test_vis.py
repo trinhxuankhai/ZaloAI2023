@@ -198,7 +198,7 @@ def main():
         for caption in sample["captions"]:
             input_captions.append(prefix + caption)
 
-        images = pipeline(sample["captions"], 
+        images = pipeline(input_captions, 
                           num_inference_steps=args.inference_steps,
                           guidance_scale=7,
                           generator=generator, height=536, width=1024).images
