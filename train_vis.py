@@ -174,7 +174,7 @@ def main():
     # freeze parameters of models to save more memory
     #unet.requires_grad_(False)
     #vae.requires_grad_(False)
-    text_encoder.requires_grad_(False)
+    #text_encoder.requires_grad_(False)
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
