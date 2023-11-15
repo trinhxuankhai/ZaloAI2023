@@ -17,6 +17,8 @@ from accelerate.state import AcceleratorState
 from accelerate.utils import ProjectConfiguration, set_seed
 from packaging import version
 from tqdm.auto import tqdm
+
+from transformers.utils import ContextManagers
 from transformers import CLIPTextModel, CLIPTokenizer
 
 import diffusers
