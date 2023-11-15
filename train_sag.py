@@ -475,14 +475,46 @@ def main():
                 generator = generator.manual_seed(cfg.TRAIN.SEED)
             
             images = []
-            images_sag = []
             captions = []
             for sample in val_dataloader:
                 images.append(
                     pipeline(sample["captions"][0], generator=generator).images[0]
                 )
-                images_sag.append(
-                    pipeline(sample["captions"][0], guidance_scale=1.0, sag_scale=1.0, generator=generator).images[0]
+                captions.append(sample["captions"][0])
+
+            for tracker in accelerator.trackers:
+                if tracker.name == "wandb":
+                    tracker.log(
+                        {
+                            "validation_sag": [
+                                wandb.Image(image, caption=caption)
+                                for i, (image, caption) in enumerate(zip(images, captions))
+                            ]
+                        }
+                    )
+            del pipeline
+            torch.cuda.empty_cache()
+
+            # create pipeline
+            pipeline = DiffusionPipeline.from_pretrained(
+                cfg.MODEL.NAME,
+                unet=accelerator.unwrap_model(unet),
+                revision=args.revision,
+                torch_dtype=weight_dtype,
+            )
+            pipeline = pipeline.to(accelerator.device)
+            pipeline.set_progress_bar_config(disable=True)
+
+            # run inference
+            generator = torch.Generator(device=accelerator.device)
+            if cfg.TRAIN.SEED is not None:
+                generator = generator.manual_seed(cfg.TRAIN.SEED)
+            
+            images = []
+            captions = []
+            for sample in val_dataloader:
+                images.append(
+                    pipeline(sample["captions"][0], generator=generator).images[0]
                 )
                 captions.append(sample["captions"][0])
 
@@ -493,14 +525,6 @@ def main():
                             "validation": [
                                 wandb.Image(image, caption=caption)
                                 for i, (image, caption) in enumerate(zip(images, captions))
-                            ]
-                        }
-                    )
-                    tracker.log(
-                        {
-                            "validation_sag": [
-                                wandb.Image(image, caption=caption)
-                                for i, (image, caption) in enumerate(zip(images_sag, captions))
                             ]
                         }
                     )
