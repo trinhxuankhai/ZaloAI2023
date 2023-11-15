@@ -172,8 +172,9 @@ def main():
     )
 
     # freeze parameters of models to save more memory
-    vae.requires_grad_(False)
-    text_encoder.requires_grad_(False)
+    #unet.requires_grad_(False)
+    #vae.requires_grad_(False)
+    #text_encoder.requires_grad_(False)
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
@@ -185,17 +186,53 @@ def main():
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
-    vae.to(accelerator.device, dtype=weight_dtype)
-    unet.enable_gradient_checkpointing()
-    
+    vae.to(accelerator.device, dtype=torch.float32)
+    text_encoder.to(accelerator.device, dtype=weight_dtype)
+
+    # now we will add new LoRA weights to the attention layers
+    # It's important to realize here how many attention weights will be added and of which sizes
+    # The sizes of the attention layers consist only of two different variables:
+    # 1) - the "hidden_size", which is increased according to `unet.config.block_out_channels`.
+    # 2) - the "cross attention size", which is set to `unet.config.cross_attention_dim`.
+
+    # Let's first see how many attention processors we will have to set.
+    # For Stable Diffusion, it should be equal to:
+    # - down blocks (2x attention layers) * (2x transformer layers) * (3x down blocks) = 12
+    # - mid blocks (2x attention layers) * (1x transformer layers) * (1x mid blocks) = 2
+    # - up blocks (2x attention layers) * (3x transformer layers) * (3x down blocks) = 18
+    # => 32 layers
+
+    # Set correct lora layers
+    lora_attn_procs = {}
+    for name in unet.attn_processors.keys():
+        cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
+        if name.startswith("mid_block"):
+            hidden_size = unet.config.block_out_channels[-1]
+        elif name.startswith("up_blocks"):
+            block_id = int(name[len("up_blocks.")])
+            hidden_size = list(reversed(unet.config.block_out_channels))[block_id]
+        elif name.startswith("down_blocks"):
+            block_id = int(name[len("down_blocks.")])
+            hidden_size = unet.config.block_out_channels[block_id]
+
+        lora_attn_procs[name] = LoRAAttnProcessor(
+            hidden_size=hidden_size,
+            cross_attention_dim=cross_attention_dim,
+            rank=cfg.MODEL.RANK,
+        )
+
+    unet.set_attn_processor(lora_attn_procs)
+    lora_layers = AttnProcsLayers(unet.attn_processors)
+
     if cfg.TRAIN.LR.SCALE_LR:
         cfg.TRAIN.LR.BASE_LR = (
             cfg.TRAIN.LR.BASE_LR * cfg.TRAIN.GRADIENT_ACCUMULATION_STEP * cfg.TRAIN.BATCH_SIZE * accelerator.num_processes
         )
 
     optimizer_cls = torch.optim.AdamW
+
     optimizer = optimizer_cls(
-        unet.parameters(),
+        list(lora_layers.parameters()) + list(vae.parameters()),
         lr=cfg.TRAIN.LR.BASE_LR,
         betas=cfg.TRAIN.OPTIMIZER.BETAS,
         weight_decay=cfg.TRAIN.OPTIMIZER.WEIGHT_DECAY,
@@ -217,8 +254,8 @@ def main():
     )
 
     # Prepare everything with our `accelerator`.
-    unet, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
-        unet, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler
+    lora_layers, vae, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
+        lora_layers, vae, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -282,6 +319,7 @@ def main():
 
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
         unet.train()
+        vae.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
@@ -350,7 +388,7 @@ def main():
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    params_to_clip = unet.parameters()
+                    params_to_clip = list(lora_layers.parameters()) + list(vae.parameters())
                     accelerator.clip_grad_norm_(params_to_clip, cfg.TRAIN.MAX_NORM)
                 optimizer.step()
                 lr_scheduler.step()
