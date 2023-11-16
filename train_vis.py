@@ -316,6 +316,7 @@ def main():
 
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+                encoder_hidden_states = encoder_hidden_states.to(weight_dtype)
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
