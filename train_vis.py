@@ -23,12 +23,10 @@ from transformers.utils import ContextManagers
 from transformers import CLIPTextModel, CLIPTokenizer
 
 import diffusers
+from diffusers.loaders import LoraLoaderMixin
 from diffusers import AutoencoderKL, DDPMScheduler, DiffusionPipeline, UNet2DConditionModel, EulerAncestralDiscreteScheduler
-from diffusers.loaders import AttnProcsLayers
-from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import compute_snr
-from diffusers.utils.import_utils import is_xformers_available
 
 from configs.default import get_default_config
 
@@ -167,23 +165,10 @@ def main():
     tokenizer = CLIPTokenizer.from_pretrained(
         cfg.MODEL.NAME, subfolder="tokenizer", revision=args.revision
     )
-    def deepspeed_zero_init_disabled_context_manager():
-        """
-        returns either a context list that includes one that will disable zero.Init or an empty context list
-        """
-        deepspeed_plugin = AcceleratorState().deepspeed_plugin if accelerate.state.is_initialized() else None
-        if deepspeed_plugin is None:
-            return []
-
-        return [deepspeed_plugin.zero3_init_context_manager(enable=False)]
-
-    with ContextManagers(deepspeed_zero_init_disabled_context_manager()):
-        text_encoder = CLIPTextModel.from_pretrained(
-            cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
-        )
-        vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)
-
-    
+    text_encoder = CLIPTextModel.from_pretrained(
+        cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
+    )
+    vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
     unet = UNet2DConditionModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="unet", revision=args.revision
     )
@@ -191,6 +176,7 @@ def main():
     # freeze parameters of models to save more memory
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
+    unet.requires_grad_(False)
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
@@ -202,8 +188,12 @@ def main():
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     text_encoder.to(accelerator.device, dtype=weight_dtype)
-    vae.to(accelerator.device, dtype=weight_dtype)
-    unet.enable_gradient_checkpointing()
+    vae.to(accelerator.device, dtype=torch.float32)
+    unet.to(accelerator.device, dtype=weight_dtype)
+
+    text_lora_parameters = LoraLoaderMixin._modify_text_encoder(
+        text_encoder, dtype=torch.float32, rank=cfg.MODEL.RANK
+    )
     
     if cfg.TRAIN.LR.SCALE_LR:
         cfg.TRAIN.LR.BASE_LR = (
@@ -212,7 +202,7 @@ def main():
 
     optimizer_cls = torch.optim.AdamW
     optimizer = optimizer_cls(
-        unet.parameters(),
+        text_lora_parameters,
         lr=cfg.TRAIN.LR.BASE_LR,
         betas=cfg.TRAIN.OPTIMIZER.BETAS,
         weight_decay=cfg.TRAIN.OPTIMIZER.WEIGHT_DECAY,
@@ -234,8 +224,8 @@ def main():
     )
 
     # Prepare everything with our `accelerator`.
-    unet, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
-        unet, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler
+    text_encoder, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
+        text_encoder, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -298,10 +288,10 @@ def main():
     )
 
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
-        unet.train()
+        text_encoder.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
-            with accelerator.accumulate(unet):
+            with accelerator.accumulate(text_encoder):
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(weight_dtype)).latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
@@ -366,8 +356,7 @@ def main():
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    params_to_clip = unet.parameters()
-                    accelerator.clip_grad_norm_(params_to_clip, cfg.TRAIN.MAX_NORM)
+                    accelerator.clip_grad_norm_(text_lora_parameters, cfg.TRAIN.MAX_NORM)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
@@ -419,9 +408,9 @@ def main():
             pipeline = DiffusionPipeline.from_pretrained(
                 cfg.MODEL.NAME,
                 vae=vae,
-                text_encoder=text_encoder,
+                text_encoder=accelerator.unwrap_model(text_encoder),
                 tokenizer=tokenizer,
-                unet=accelerator.unwrap_model(unet),
+                unet=unet,
                 revision=args.revision,
                 torch_dtype=weight_dtype,
             )
@@ -443,8 +432,7 @@ def main():
                     images.append(
                         pipeline(sample["captions"][0], 
                                 generator=generator, 
-                                num_inference_steps=30, 
-                                guidance_scale=5).images[0]
+                                num_inference_steps=30).images[0]
                     )
                 captions.append(sample["captions"][0])
 
