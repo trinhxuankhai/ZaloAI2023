@@ -175,7 +175,7 @@ def main():
 
     # freeze parameters of models to save more memory
     vae.requires_grad_(False)
-    text_encoder.requires_grad_(False)
+    # text_encoder.requires_grad_(False)
     unet.requires_grad_(False)
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
@@ -187,13 +187,13 @@ def main():
         weight_dtype = torch.bfloat16
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
-    text_encoder.to(accelerator.device, dtype=weight_dtype)
+    # text_encoder.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=torch.float32)
     unet.to(accelerator.device, dtype=weight_dtype)
 
-    text_lora_parameters = LoraLoaderMixin._modify_text_encoder(
-        text_encoder, dtype=torch.float32, rank=cfg.MODEL.RANK
-    )
+    # text_lora_parameters = LoraLoaderMixin._modify_text_encoder(
+    #     text_encoder, dtype=torch.float32, rank=cfg.MODEL.RANK
+    # )
     
     if cfg.TRAIN.LR.SCALE_LR:
         cfg.TRAIN.LR.BASE_LR = (
@@ -202,7 +202,7 @@ def main():
 
     optimizer_cls = torch.optim.AdamW
     optimizer = optimizer_cls(
-        text_lora_parameters,
+        text_encoder.parameters(),
         lr=cfg.TRAIN.LR.BASE_LR,
         betas=cfg.TRAIN.OPTIMIZER.BETAS,
         weight_decay=cfg.TRAIN.OPTIMIZER.WEIGHT_DECAY,
@@ -358,7 +358,7 @@ def main():
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(text_lora_parameters, cfg.TRAIN.MAX_NORM)
+                    accelerator.clip_grad_norm_(text_encoder.parameters(), cfg.TRAIN.MAX_NORM)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
