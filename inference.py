@@ -3,7 +3,7 @@ import torch
 import argparse
 import pandas as pd
 from PIL import Image
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer
 from diffusers import AutoPipelineForImage2Image, AutoencoderKL, DPMSolverMultistepScheduler
