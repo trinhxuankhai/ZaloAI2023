@@ -89,8 +89,12 @@ def main():
     prefix_prompt = "Create an advertising banner about "
     for i in tqdm(range(0, data_len, bs)):
         prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
+        descriptions = test_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
+        moreInfos = test_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
+
         for k in range(len(prompts)):
-            prompts[k] = prefix_prompt + prompts[k] 
+            #prompts[k] = prefix_prompt + prompts[k] 
+            prompts[k] = prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
 
         init_image_paths = []
         save_paths = []
