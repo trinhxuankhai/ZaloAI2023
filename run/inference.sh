@@ -1,0 +1,1 @@
+python3 inference.py --output_dir inference/realvis_prompt
