@@ -111,7 +111,9 @@ def main():
             init_images.append(init_image)
 
         # images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=30, strength=0.6, height=536, width=1024).images
-        images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=30, strength=0.65, height=536, width=1024, negative_prompt=negative_prompt).images
+        images = pipeline(prompts, image=init_images, 
+                          generator=generator, num_inference_steps=30, 
+                          strength=0.65, height=536, width=1024, negative_prompt=[negative_prompt]*len(prompts)).images
 
         for image, save_path in zip(images, save_paths):
             image = image.resize((1024, 533))
