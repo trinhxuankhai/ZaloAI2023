@@ -141,7 +141,7 @@ def main():
         images = pipeline(prompts, image=init_images, 
                           generator=generator, num_inference_steps=30, 
                           strength=0.6, height=536, width=1024, 
-                          negative_prompt=[negative_prompt], num_images_per_prompt=6).images
+                          negative_prompt=[negative_prompt], num_images_per_prompt=4).images
 
         rand = random.randint(0, 6)
         image = images[rand]
