@@ -97,8 +97,9 @@ def main():
         for k in range(len(prompts)):
             # prompts[k] = prefix_prompt + prompts[k] 
             # prompts[k] = prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
-            prompts[k] = prefix_prompt + prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
-
+            # prompts[k] = prefix_prompt + prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
+            prompts[k] = prefix_prompt + prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
+            
         init_image_paths = []
         save_paths = []
         for j in range(i, min(i+bs, data_len)):
