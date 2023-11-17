@@ -1,3 +1,5 @@
 diffusers
 transformers
 wandb
+accelerate
+huggingface_hub
