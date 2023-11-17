@@ -77,7 +77,7 @@ def main():
     pipeline = AutoPipelineForImage2Image.from_pretrained(
         "SG161222/Realistic_Vision_V5.1_noVAE",
         vae=vae,
-        torch_dtype=torch.float16, variant="fp16", use_safetensors=True
+        torch_dtype=torch.float16
     ).to("cuda")
     generator = torch.Generator(device="cuda").manual_seed(1024)
     pipeline.set_progress_bar_config(disable=True)
@@ -143,7 +143,7 @@ def main():
                           strength=0.6, height=536, width=1024, 
                           negative_prompt=[negative_prompt], num_images_per_prompt=4).images
 
-        rand = random.randint(0, 6)
+        rand = random.randint(0, 4)
         image = images[rand]
         image = image.resize((1024, 533))
         image.save(save_paths[0])
