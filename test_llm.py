@@ -25,8 +25,8 @@ prompts = translator.translate(prompts, src='vi', dest='en').text
 
 # 'pipeline' execution
 start = time.time()
-for _ in range(10):
+for _ in range(100):
     output = llm(prompts, stream=False)
 end = time.time()
 
-print((start-end)/10)
+print((end-start)/100)
