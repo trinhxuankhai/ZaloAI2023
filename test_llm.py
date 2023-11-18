@@ -1,5 +1,6 @@
 import time
 import googletrans
+from tqdm import tqdm
 from ctransformers import AutoModelForCausalLM
 
 translator = googletrans.Translator()
@@ -25,7 +26,8 @@ prompts = translator.translate(prompts, src='vi', dest='en').text
 
 # 'pipeline' execution
 start = time.time()
-for _ in range(100):
+for _ in tqdm(range(100)):
+    print("a")
     output = llm(prompts, stream=False)
 end = time.time()
 
