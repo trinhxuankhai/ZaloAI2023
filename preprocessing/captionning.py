@@ -33,7 +33,7 @@ def main():
     ci.config.quiet = True
 
     prompts = []
-    for idx in range(len(train_data)):
+    for idx in range(330, len(train_data)):
         image = Image.open(os.path.join(folder_path, train_data.iloc[idx]["bannerImage"])).convert('RGB')
         prompt = image_to_prompt(image, prompt_mode)
         prompts.append(prompt)
