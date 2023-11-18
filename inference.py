@@ -150,7 +150,7 @@ def main():
         if bool(has_person[train_data.iloc[int(indices[i])]["bannerImage"]]):
             images = pipeline(prompts, image=init_images, 
                             generator=generator, num_inference_steps=30, 
-                            strength=0.4, height=536, width=1024).images
+                            strength=0.45, height=536, width=1024).images
         else:
             images = pipeline(prompts, image=init_images, 
                             generator=generator, num_inference_steps=30, 
