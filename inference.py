@@ -126,7 +126,7 @@ def main():
     #         image = image.resize((1024, 533))
     #         image.save(save_path)
 
-    bs = 1
+    bs = 8
     data_len = len(test_data_trans)
     for i in tqdm(range(0, data_len, bs)):
         prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
