@@ -69,7 +69,6 @@ def main():
         similarity, k=1, dim=1, largest=True, sorted=True
     )  # q * topk
 
-
     # Load diffusers for inference
     vae = AutoencoderKL.from_single_file("https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors")
     vae.to("cuda", dtype=torch.float16)
@@ -88,7 +87,8 @@ def main():
     bs = 4
     data_len = len(test_data_trans)
     prefix_prompt = "Create an advertising banner about "
-    negative_prompt = "nude girl, deformed hands,  watermark, text, deformed fingers, blurred faces, irregular face, irrregular body shape, ugly eyes, deformed face, squint, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, poorly framed, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft, ugly eyes, squint, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, poorly framed, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft, disfigured, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal, 2 heads, 2 faces"
+    # negative_prompt = "nude girl, deformed hands,  watermark, text, deformed fingers, blurred faces, irregular face, irrregular body shape, ugly eyes, deformed face, squint, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, poorly framed, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft, ugly eyes, squint, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, poorly framed, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft, disfigured, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal, 2 heads, 2 faces"
+    negative_prompt = "nude boy, nude girl"
     for i in tqdm(range(0, data_len, bs)):
         prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
         descriptions = test_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
@@ -97,8 +97,8 @@ def main():
         for k in range(len(prompts)):
             # prompts[k] = prefix_prompt + prompts[k] 
             # prompts[k] = prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
-            # prompts[k] = prefix_prompt + prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
-            prompts[k] = prefix_prompt + prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
+            prompts[k] = prefix_prompt + prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
+            # prompts[k] = prefix_prompt + prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
             
         init_image_paths = []
         save_paths = []
