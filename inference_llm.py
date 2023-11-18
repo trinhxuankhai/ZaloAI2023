@@ -122,7 +122,7 @@ def main():
         save_paths = []
         for j in range(i, min(i+bs, data_len)):
             # Some value
-            init_image_paths.append(train_data.iloc[int(indices[j])]["bannerImage"])
+            init_image_paths.append(train_data.iloc[int(indices[j][0])]["bannerImage"])
             save_paths.append(os.path.join(args.output_dir, test_data_trans.iloc[j]["bannerImage"]))
 
             # LLM prompts
@@ -132,7 +132,7 @@ def main():
             fewshot_out1 = caption_dict[train_data_trans.iloc[int(indices[j][1])]["bannerImage"]]
             prompt = template.format(fewshot_in0, fewshot_out0, fewshot_in1, fewshot_out1, prompts[j-i])
             prompt = llm(prompt, stream=False)
-            prompt = prompt.split('\n\n')[0].strip()
+            prompt = prompt.strip().split('\n')[0]
             prompts[j-i] = prompt
 
         init_images = []
