@@ -1,3 +1,4 @@
+import time
 import googletrans
 from ctransformers import AutoModelForCausalLM
 
@@ -23,6 +24,9 @@ prompts = f'''Mô tả lại ảnh quảng cáo từ đoạn quảng cáo sau\n\
 prompts = translator.translate(prompts, src='vi', dest='en').text
 
 # 'pipeline' execution
-output = llm(prompts, stream=False)
+start = time.time()
+for _ in range(10):
+    output = llm(prompts, stream=False)
+end = time.time()
 
-print(output.split('\n\n')[0])
+print((start-end)/10)
