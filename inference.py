@@ -1,5 +1,6 @@
 import os
 import random
+import json
 import torch
 import argparse
 import pandas as pd
@@ -84,11 +85,15 @@ def main():
     # Create save dir
     os.makedirs(args.output_dir, exist_ok=True)
 
+    # Has person
+    with open('./data/train/od.json', 'r') as openfile:
+        has_person = json.load(openfile)
+
     bs = 4
     data_len = len(test_data_trans)
     prefix_prompt = "Create an advertising banner about "
-    # negative_prompt = "nude girl, deformed hands,  watermark, text, deformed fingers, blurred faces, irregular face, irrregular body shape, ugly eyes, deformed face, squint, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, poorly framed, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft, ugly eyes, squint, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, poorly framed, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft, disfigured, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal, 2 heads, 2 faces"
-    negative_prompt = "nude boy, nude girl"
+    negative_prompt = "nude girl, deformed hands,  watermark, text, deformed fingers, blurred faces, irregular face, irrregular body shape, ugly eyes, deformed face, squint, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, poorly framed, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft, ugly eyes, squint, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, poorly framed, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft, disfigured, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal, 2 heads, 2 faces"
+    # negative_prompt = "nude boy, nude girl"
     for i in tqdm(range(0, data_len, bs)):
         prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
         descriptions = test_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
@@ -97,24 +102,29 @@ def main():
         for k in range(len(prompts)):
             # prompts[k] = prefix_prompt + prompts[k] 
             # prompts[k] = prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
-            prompts[k] = prefix_prompt + prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
             # prompts[k] = prefix_prompt + prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
+            prompts[k] = prefix_prompt + prompts[k] + '. ' + descriptions[k] + '. ' + moreInfos[k]
             
         init_image_paths = []
         save_paths = []
+        sample_negative_prompts = []
         for j in range(i, min(i+bs, data_len)):
             init_image_paths.append(train_data.iloc[int(indices[j])]["bannerImage"])
             save_paths.append(os.path.join(args.output_dir, test_data_trans.iloc[j]["bannerImage"]))
+            
+            if bool(has_person[train_data.iloc[int(indices[j])]["bannerImage"]]):
+                sample_negative_prompts.append(negative_prompt)
+            else:
+                sample_negative_prompts.append("")
 
         init_images = []
         for init_image_path in init_image_paths:
             init_image = load_image(os.path.join('./data/train/images', init_image_path))
             init_images.append(init_image)
 
-        # images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=30, strength=0.6, height=536, width=1024).images
         images = pipeline(prompts, image=init_images, 
                           generator=generator, num_inference_steps=30, 
-                          strength=0.6, height=536, width=1024, negative_prompt=[negative_prompt]*len(prompts)).images
+                          strength=0.6, height=536, width=1024, negative_prompt=sample_negative_prompts).images
 
         for image, save_path in zip(images, save_paths):
             image = image.resize((1024, 533))
