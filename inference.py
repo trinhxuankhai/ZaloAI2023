@@ -154,7 +154,8 @@ def main():
         else:
             images = pipeline(prompts, image=init_images, 
                             generator=generator, num_inference_steps=30, 
-                            strength=0.7, height=536, width=1024).images
+                            # strength=0.7, 
+                            height=536, width=1024).images
 
         for image, save_path in zip(images, save_paths):
             image = image.resize((1024, 533))
