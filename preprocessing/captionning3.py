@@ -33,15 +33,15 @@ def main():
     ci.config.quiet = True
 
     prompts = []
-    start = 0
-    end = int(0.25*len(train_data))
+    start = int(0.75*len(train_data))
+    end = len(train_data)
     for idx in tqdm(range(start, end)):
         image_path = train_data.iloc[idx]["bannerImage"]
         image = Image.open(os.path.join(folder_path, image_path)).convert('RGB')
         prompt = image_to_prompt(image, prompt_mode)
         prompts.append(dict(prompt=prompt, image=image_path))
     
-    csv_path = os.path.join("./data/train", 'caption1.csv')
+    csv_path = os.path.join("./data/train", 'caption4.csv')
     with open(csv_path, 'w', encoding='utf-8', newline='') as f:
         w = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
         w.writerow(['image', 'prompt'])
