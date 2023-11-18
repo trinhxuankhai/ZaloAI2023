@@ -2,6 +2,7 @@ import os
 import csv
 from tqdm import tqdm
 from PIL import Image
+import pandas as pd
 from clip_interrogator import Config, Interrogator
 
 caption_model_name = 'blip-large'
@@ -28,12 +29,12 @@ def image_to_prompt(image, mode):
 def main():
     folder_path = "./data/train/images"
     prompt_mode = 'best'
-
+    train_data = pd.read_csv("./data/train/info.csv")
     ci.config.quiet = True
-    files = [f for f in os.listdir(folder_path) if f.endswith('.jpg') or f.endswith('.png')] if os.path.exists(folder_path) else []
+
     prompts = []
-    for idx, file in enumerate(tqdm(files, desc='Generating prompts')):
-        image = Image.open(os.path.join(folder_path, file)).convert('RGB')
+    for idx in range(len(train_data)):
+        image = Image.open(os.path.join(folder_path, train_data.iloc[idx]["bannerImage"])).convert('RGB')
         prompt = image_to_prompt(image, prompt_mode)
         prompts.append(prompt)
     
@@ -41,8 +42,8 @@ def main():
     with open(csv_path, 'w', encoding='utf-8', newline='') as f:
         w = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
         w.writerow(['image', 'prompt'])
-        for file, prompt in zip(files, prompts):
-            w.writerow([file, prompt])
+        for idx, prompt in enumerate(prompts):
+            w.writerow([train_data.iloc[idx]["bannerImage"], prompt])
 
 if __name__ == "__main__":
     main()
