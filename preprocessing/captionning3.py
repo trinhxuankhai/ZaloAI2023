@@ -40,7 +40,6 @@ def main():
         image = Image.open(os.path.join(folder_path, image_path)).convert('RGB')
         prompt = image_to_prompt(image, prompt_mode)
         prompts.append(dict(prompt=prompt, image=image_path))
-        break
     
     csv_path = os.path.join("./data/train", 'caption4.csv')
     with open(csv_path, 'w', encoding='utf-8', newline='') as f:
