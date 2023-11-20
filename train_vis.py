@@ -57,12 +57,12 @@ def preprocess_val():
     # Extract embeddings
     test_embeds = []
     for test_caption in test_captions:
-        sample = torch.from_numpy(sim_model.encode([test_caption]))
+        sample = torch.from_numpy(sim_model.encode([test_caption], show_progress_bar=False))
         test_embeds.append(sample)
 
     train_embeds = []
     for train_caption in train_captions:
-        sample = torch.from_numpy(sim_model.encode([train_caption]))
+        sample = torch.from_numpy(sim_model.encode([train_caption], show_progress_bar=False))
         train_embeds.append(sample)
 
     test_embeds = torch.cat(test_embeds, dim=0)
