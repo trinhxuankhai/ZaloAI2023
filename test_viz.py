@@ -28,11 +28,6 @@ from configs.default import get_default_config
 
 logger = get_logger(__name__, log_level="INFO")
 
-def preprocess_val():
-    
-
-    return test_data, train_data, test_data_trans, indices
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Trainning script")
     parser.add_argument('--config', default="configs/baseline.yaml", type=str, help='config_file')
@@ -111,21 +106,21 @@ def main():
 
     # Load captions
     test_captions = []
-    for i in range(len(test_data)):
+    for i in tqdm(range(len(test_data))):
         test_captions.append(test_data.iloc[i]["caption"])
 
     train_captions = []
-    for i in range(len(train_data)):
+    for i in tqdm(range(len(train_data))):
         train_captions.append(train_data.iloc[i]["caption"])
 
     # Extract embeddings
     test_embeds = []
-    for test_caption in test_captions:
+    for test_caption in tqdm(test_captions):
         sample = torch.from_numpy(sim_model.encode([test_caption]))
         test_embeds.append(sample)
 
     train_embeds = []
-    for train_caption in train_captions:
+    for train_caption in tqdm(train_captions):
         sample = torch.from_numpy(sim_model.encode([train_caption]))
         train_embeds.append(sample)
 
