@@ -1,81 +1,35 @@
 import os
-import math
-import wandb
-import shutil
 import logging
 import argparse
-import itertools
 import pandas as pd
-from pathlib import Path
-from tqdm.auto import tqdm
-from packaging import version
+from tqdm import tqdm
 
 import torch
 import torch.utils.checkpoint
 import torch.nn.functional as F
 from datasets.build import build_dataloader
 
-import accelerate 
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from accelerate.state import AcceleratorState
-from accelerate.utils import ProjectConfiguration, set_seed
+from accelerate.utils import set_seed
 
 import transformers
-from transformers.utils import ContextManagers
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from sentence_transformers import SentenceTransformer
 
 import diffusers
 from diffusers.utils import load_image
-from diffusers.optimization import get_scheduler
-from diffusers.training_utils import compute_snr
 from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
-from diffusers import AutoencoderKL, DDPMScheduler, AutoPipelineForImage2Image, UNet2DConditionModel
+from diffusers import AutoencoderKL, AutoPipelineForImage2Image, UNet2DConditionModel
 
 from configs.default import get_default_config
 
 logger = get_logger(__name__, log_level="INFO")
 
 def preprocess_val():
-    sim_model = SentenceTransformer('bkai-foundation-models/vietnamese-bi-encoder')
-    test_data = pd.read_csv("./data/test/info.csv")
-    train_data = pd.read_csv("./data/train/info.csv")
-    test_data_trans = pd.read_csv("./data/test/info_trans.csv")
-
-    # Load captions
-    test_captions = []
-    for i in range(len(test_data)):
-        test_captions.append(test_data.iloc[i]["caption"])
-
-    train_captions = []
-    for i in range(len(train_data)):
-        train_captions.append(train_data.iloc[i]["caption"])
-
-    # Extract embeddings
-    test_embeds = []
-    for test_caption in test_captions:
-        sample = torch.from_numpy(sim_model.encode([test_caption]))
-        test_embeds.append(sample)
-
-    train_embeds = []
-    for train_caption in train_captions:
-        sample = torch.from_numpy(sim_model.encode([train_caption]))
-        train_embeds.append(sample)
-
-    test_embeds = torch.cat(test_embeds, dim=0)
-    train_embeds = torch.cat(train_embeds, dim=0)
-
-    test_embeds = F.normalize(test_embeds, dim=1, p=2)
-    train_embeds = F.normalize(train_embeds, dim=1, p=2)
-
-    # Calculate similarity 
-    similarity = torch.mm(test_embeds, train_embeds.t())
-    _, indices = torch.topk(
-        similarity, k=1, dim=1, largest=True, sorted=True
-    )  # q * topk
+    
 
     return test_data, train_data, test_data_trans, indices
 
@@ -149,10 +103,45 @@ def main():
     if cfg.TRAIN.SEED is not None:
         set_seed(cfg.TRAIN.SEED)
 
-    # Val
-    accelerator.wait_for_everyone()
-    if accelerator.is_main_process:
-        test_data, train_data, test_data_trans, indices = preprocess_val()
+    ####################################################################
+    sim_model = SentenceTransformer('bkai-foundation-models/vietnamese-bi-encoder')
+    test_data = pd.read_csv("./data/test/info.csv")
+    train_data = pd.read_csv("./data/train/info.csv")
+    test_data_trans = pd.read_csv("./data/test/info_trans.csv")
+
+    # Load captions
+    test_captions = []
+    for i in range(len(test_data)):
+        test_captions.append(test_data.iloc[i]["caption"])
+
+    train_captions = []
+    for i in range(len(train_data)):
+        train_captions.append(train_data.iloc[i]["caption"])
+
+    # Extract embeddings
+    test_embeds = []
+    for test_caption in test_captions:
+        sample = torch.from_numpy(sim_model.encode([test_caption]))
+        test_embeds.append(sample)
+
+    train_embeds = []
+    for train_caption in train_captions:
+        sample = torch.from_numpy(sim_model.encode([train_caption]))
+        train_embeds.append(sample)
+
+    test_embeds = torch.cat(test_embeds, dim=0)
+    train_embeds = torch.cat(train_embeds, dim=0)
+
+    test_embeds = F.normalize(test_embeds, dim=1, p=2)
+    train_embeds = F.normalize(train_embeds, dim=1, p=2)
+
+    # Calculate similarity 
+    similarity = torch.mm(test_embeds, train_embeds.t())
+    _, indices = torch.topk(
+        similarity, k=1, dim=1, largest=True, sorted=True
+    )  # q * topk
+
+    ###################################################################
 
     # Load scheduler, tokenizer and models.
     tokenizer = CLIPTokenizer.from_pretrained(
