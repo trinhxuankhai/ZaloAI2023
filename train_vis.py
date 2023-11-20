@@ -207,7 +207,9 @@ def main():
             os.makedirs(args.output_dir, exist_ok=True)
 
     # Val
-    test_data, train_data, test_data_trans, indices = preprocess_val()
+    accelerator.wait_for_everyone()
+    if accelerator.is_main_process:
+        test_data, train_data, test_data_trans, indices = preprocess_val()
 
     # Load scheduler, tokenizer and models.
     noise_scheduler = DDPMScheduler.from_pretrained(cfg.MODEL.NAME, subfolder="scheduler")
@@ -360,6 +362,7 @@ def main():
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
         unet.train()
         text_encoder.train()
+        vae.to(torch.float32)
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(text_encoder):
@@ -436,9 +439,6 @@ def main():
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
-
-
-                break
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
