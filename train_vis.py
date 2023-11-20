@@ -358,123 +358,123 @@ def main():
     )
 
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
-        unet.train()
-        text_encoder.train()
-        train_loss = 0.0
-        for step, batch in enumerate(train_dataloader):
-            with accelerator.accumulate(text_encoder):
-                # Convert images to latent space
-                latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-                latents = latents * vae.config.scaling_factor
-                latents = latents.to(weight_dtype)
+        # unet.train()
+        # text_encoder.train()
+        # train_loss = 0.0
+        # for step, batch in enumerate(train_dataloader):
+        #     with accelerator.accumulate(text_encoder):
+        #         # Convert images to latent space
+        #         latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
+        #         latents = latents * vae.config.scaling_factor
+        #         latents = latents.to(weight_dtype)
 
-                # Sample noise that we'll add to the latents
-                noise = torch.randn_like(latents)
-                if cfg.MODEL.NOISE_OFFSET:
-                    # https://www.crosslabs.org//blog/diffusion-with-offset-noise
-                    noise += cfg.MODEL.NOISE_OFFSET * torch.randn(
-                        (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
-                    )
+        #         # Sample noise that we'll add to the latents
+        #         noise = torch.randn_like(latents)
+        #         if cfg.MODEL.NOISE_OFFSET:
+        #             # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+        #             noise += cfg.MODEL.NOISE_OFFSET * torch.randn(
+        #                 (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
+        #             )
 
-                bsz = latents.shape[0]
-                # Sample a random timestep for each image
-                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
-                timesteps = timesteps.long()
+        #         bsz = latents.shape[0]
+        #         # Sample a random timestep for each image
+        #         timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+        #         timesteps = timesteps.long()
 
-                # Add noise to the latents according to the noise magnitude at each timestep
-                # (this is the forward diffusion process)
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+        #         # Add noise to the latents according to the noise magnitude at each timestep
+        #         # (this is the forward diffusion process)
+        #         noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-                # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(batch["input_ids"])[0]
-                encoder_hidden_states = encoder_hidden_states.to(weight_dtype)
+        #         # Get the text embedding for conditioning
+        #         encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+        #         encoder_hidden_states = encoder_hidden_states.to(weight_dtype)
 
-                # Get the target for loss depending on the prediction type
-                if args.prediction_type is not None:
-                    # set prediction_type of scheduler if defined
-                    noise_scheduler.register_to_config(prediction_type=args.prediction_type)
+        #         # Get the target for loss depending on the prediction type
+        #         if args.prediction_type is not None:
+        #             # set prediction_type of scheduler if defined
+        #             noise_scheduler.register_to_config(prediction_type=args.prediction_type)
 
-                if noise_scheduler.config.prediction_type == "epsilon":
-                    target = noise
-                elif noise_scheduler.config.prediction_type == "v_prediction":
-                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                else:
-                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+        #         if noise_scheduler.config.prediction_type == "epsilon":
+        #             target = noise
+        #         elif noise_scheduler.config.prediction_type == "v_prediction":
+        #             target = noise_scheduler.get_velocity(latents, noise, timesteps)
+        #         else:
+        #             raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
-                # Predict the noise residual and compute loss
-                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+        #         # Predict the noise residual and compute loss
+        #         model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
 
-                if args.snr_gamma is None:
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
-                else:
-                    # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
-                    # Since we predict the noise instead of x_0, the original formulation is slightly changed.
-                    # This is discussed in Section 4.2 of the same paper.
-                    snr = compute_snr(noise_scheduler, timesteps)
-                    if noise_scheduler.config.prediction_type == "v_prediction":
-                        # Velocity objective requires that we add one to SNR values before we divide by them.
-                        snr = snr + 1
-                    mse_loss_weights = (
-                        torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(dim=1)[0] / snr
-                    )
+        #         if args.snr_gamma is None:
+        #             loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+        #         else:
+        #             # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+        #             # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+        #             # This is discussed in Section 4.2 of the same paper.
+        #             snr = compute_snr(noise_scheduler, timesteps)
+        #             if noise_scheduler.config.prediction_type == "v_prediction":
+        #                 # Velocity objective requires that we add one to SNR values before we divide by them.
+        #                 snr = snr + 1
+        #             mse_loss_weights = (
+        #                 torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(dim=1)[0] / snr
+        #             )
 
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
-                    loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
-                    loss = loss.mean()
+        #             loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+        #             loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
+        #             loss = loss.mean()
 
-                # Gather the losses across all processes for logging (if we use distributed training).
-                avg_loss = accelerator.gather(loss.repeat(cfg.TRAIN.BATCH_SIZE)).mean()
-                train_loss += avg_loss.item() / cfg.TRAIN.GRADIENT_ACCUMULATION_STEP
+        #         # Gather the losses across all processes for logging (if we use distributed training).
+        #         avg_loss = accelerator.gather(loss.repeat(cfg.TRAIN.BATCH_SIZE)).mean()
+        #         train_loss += avg_loss.item() / cfg.TRAIN.GRADIENT_ACCUMULATION_STEP
 
-                # Backpropagate
-                accelerator.backward(loss)
-                if accelerator.sync_gradients:
-                    params_to_clip = (
-                        itertools.chain(lora_layers.parameters(), text_lora_parameters)
-                    )
-                    accelerator.clip_grad_norm_(params_to_clip, cfg.TRAIN.MAX_NORM)
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.zero_grad()
+        #         # Backpropagate
+        #         accelerator.backward(loss)
+        #         if accelerator.sync_gradients:
+        #             params_to_clip = (
+        #                 itertools.chain(lora_layers.parameters(), text_lora_parameters)
+        #             )
+        #             accelerator.clip_grad_norm_(params_to_clip, cfg.TRAIN.MAX_NORM)
+        #         optimizer.step()
+        #         lr_scheduler.step()
+        #         optimizer.zero_grad()
 
-            # Checks if the accelerator has performed an optimization step behind the scenes
-            if accelerator.sync_gradients:
-                progress_bar.update(1)
-                global_step += 1
-                accelerator.log({"train_loss": train_loss}, step=global_step)
-                train_loss = 0.0
+        #     # Checks if the accelerator has performed an optimization step behind the scenes
+        #     if accelerator.sync_gradients:
+        #         progress_bar.update(1)
+        #         global_step += 1
+        #         accelerator.log({"train_loss": train_loss}, step=global_step)
+        #         train_loss = 0.0
 
-                if global_step % args.checkpointing_steps == 0:
-                    if accelerator.is_main_process:
-                        # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
-                        if args.checkpoints_total_limit is not None:
-                            checkpoints = os.listdir(args.output_dir)
-                            checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
-                            checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
+        #         if global_step % args.checkpointing_steps == 0:
+        #             if accelerator.is_main_process:
+        #                 # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
+        #                 if args.checkpoints_total_limit is not None:
+        #                     checkpoints = os.listdir(args.output_dir)
+        #                     checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
+        #                     checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
 
-                            # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
-                            if len(checkpoints) >= args.checkpoints_total_limit:
-                                num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
-                                removing_checkpoints = checkpoints[0:num_to_remove]
+        #                     # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
+        #                     if len(checkpoints) >= args.checkpoints_total_limit:
+        #                         num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
+        #                         removing_checkpoints = checkpoints[0:num_to_remove]
 
-                                logger.info(
-                                    f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
-                                )
-                                logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
+        #                         logger.info(
+        #                             f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
+        #                         )
+        #                         logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
 
-                                for removing_checkpoint in removing_checkpoints:
-                                    removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
-                                    shutil.rmtree(removing_checkpoint)
+        #                         for removing_checkpoint in removing_checkpoints:
+        #                             removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
+        #                             shutil.rmtree(removing_checkpoint)
 
-                        save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
-                        accelerator.save_state(save_path)
-                        logger.info(f"Saved state to {save_path}")
+        #                 save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+        #                 accelerator.save_state(save_path)
+        #                 logger.info(f"Saved state to {save_path}")
 
-            logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
-            progress_bar.set_postfix(**logs)
+        #     logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+        #     progress_bar.set_postfix(**logs)
 
-            if global_step >= max_train_steps:
-                break
+        #     if global_step >= max_train_steps:
+        #         break
 
         if accelerator.is_main_process:
             logger.info(

@@ -128,7 +128,8 @@ class BannerDataset(Dataset):
         sample = self.data.iloc[index]
 
         # Load caption =0
-        caption = sample["caption"]
+        # caption = sample["caption"]
+        caption = sample['caption'] + ', description is ' + sample['description'] + ' and more information is ' + sample['moreInfo']
         # caption_vn = self.data_vn.iloc[index]["caption"]
         
         if self.mode == "train" or self.mode == "val":
