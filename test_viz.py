@@ -116,12 +116,12 @@ def main():
     # Extract embeddings
     test_embeds = []
     for test_caption in tqdm(test_captions):
-        sample = torch.from_numpy(sim_model.encode([test_caption]))
+        sample = torch.from_numpy(sim_model.encode([test_caption], show_progress_bar=False))
         test_embeds.append(sample)
 
     train_embeds = []
     for train_caption in tqdm(train_captions):
-        sample = torch.from_numpy(sim_model.encode([train_caption]))
+        sample = torch.from_numpy(sim_model.encode([train_caption], show_progress_bar=False))
         train_embeds.append(sample)
 
     test_embeds = torch.cat(test_embeds, dim=0)
@@ -135,7 +135,6 @@ def main():
     _, indices = torch.topk(
         similarity, k=1, dim=1, largest=True, sorted=True
     )  # q * topk
-
     ###################################################################
 
     # Load scheduler, tokenizer and models.
