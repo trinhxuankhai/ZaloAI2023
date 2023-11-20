@@ -483,7 +483,7 @@ def main():
             # create pipeline
             pipeline = AutoPipelineForImage2Image.from_pretrained(
                 cfg.MODEL.NAME,
-                vae=vae,
+                vae=vae.to(weight_dtype),
                 tokenizer=tokenizer,
                 text_encoder=accelerator.unwrap_model(text_encoder),
                 unet=accelerator.unwrap_model(unet),
