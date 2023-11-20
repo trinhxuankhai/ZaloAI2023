@@ -96,22 +96,6 @@ def parse_args():
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
-        "--snr_gamma",
-        type=float,
-        default=None,
-        help="SNR weighting gamma to be used if rebalancing the loss. Recommended value is 5.0. "
-        "More details here: https://arxiv.org/abs/2303.09556.",
-    )
-    parser.add_argument(
-        "--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes."
-    )
-    parser.add_argument(
-        "--prediction_type",
-        type=str,
-        default=None,
-        help="The prediction_type that shall be used for training. Choose between 'epsilon' or 'v_prediction' or leave `None`. If left to `None` the default prediction type of the scheduler: `noise_scheduler.config.prediciton_type` is chosen.",
-    )
-    parser.add_argument(
         "--logging_dir",
         type=str,
         default="./logs",
@@ -126,21 +110,6 @@ def parse_args():
             " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the"
             " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."
         ),
-    )
-    parser.add_argument(
-        "--checkpointing_steps",
-        type=int,
-        default=500,
-        help=(
-            "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
-            " training using `--resume_from_checkpoint`."
-        ),
-    )
-    parser.add_argument(
-        "--checkpoints_total_limit",
-        type=int,
-        default=5,
-        help=("Max number of checkpoints to store."),
     )
     parser.add_argument(
         "--resume_from_checkpoint",
@@ -202,7 +171,6 @@ def main():
         test_data, train_data, test_data_trans, indices = preprocess_val()
 
     # Load scheduler, tokenizer and models.
-    noise_scheduler = DDPMScheduler.from_pretrained(cfg.MODEL.NAME, subfolder="scheduler")
     tokenizer = CLIPTokenizer.from_pretrained(
         cfg.MODEL.NAME, subfolder="tokenizer", revision=args.revision
     )
@@ -283,8 +251,6 @@ def main():
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
-            global_step = int(path.split("-")[1])
-
    
     if accelerator.is_main_process:
         logger.info(
@@ -310,11 +276,8 @@ def main():
             generator = generator.manual_seed(cfg.TRAIN.SEED)
         
         bs = 4
-        start = 245
-        data_len = 255 
-        total_images = []
-        total_captions = []
-        for i in tqdm(range(start, data_len, bs)):
+        data_len = len(test_data_trans)
+        for i in tqdm(range(0, data_len, bs)):
             prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
             descriptions = test_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
             moreInfos = test_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
@@ -335,22 +298,9 @@ def main():
 
             images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=30, strength=0.6, height=536, width=1024).images
             
-            for image, prompt in zip(images, prompts):
-                total_images.append(image)
-                total_captions.append(prompt)
-
-        for tracker in accelerator.trackers:
-            if tracker.name == "wandb":
-                tracker.log(
-                    {
-                        "validation": [
-                            wandb.Image(image, caption)
-                            for i, (image, caption) in enumerate(zip(total_images, total_captions))
-                        ]
-                    }
-                )
-        del pipeline
-        torch.cuda.empty_cache()
+            for image, save_path in zip(images, save_paths):
+                image = image.resize((1024, 533))
+                image.save(save_path)
 
 if __name__ == "__main__":
     main()
