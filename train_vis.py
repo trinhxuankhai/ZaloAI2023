@@ -358,8 +358,8 @@ def main():
     )
 
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
-        # unet.train()
-        # text_encoder.train()
+        unet.train()
+        text_encoder.train()
         # train_loss = 0.0
         # for step, batch in enumerate(train_dataloader):
         #     with accelerator.accumulate(text_encoder):
