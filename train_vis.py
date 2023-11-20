@@ -253,7 +253,7 @@ def main():
         lora_attn_procs[name] = LoRAAttnProcessor(
             hidden_size=hidden_size,
             cross_attention_dim=cross_attention_dim,
-            rank=args.rank,
+            rank=cfg.MODEL.RANK,
         )
 
     unet.set_attn_processor(lora_attn_procs)
