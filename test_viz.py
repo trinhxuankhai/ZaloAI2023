@@ -250,7 +250,7 @@ def main():
                 init_image = load_image(os.path.join('./data/train/images', init_image_path))
                 init_images.append(init_image)
 
-            images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=50, strength=0.6, height=536, width=1024).images
+            images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=30, strength=0.6, height=536, width=1024).images
             
             for image, save_path in zip(images, save_paths):
                 image = image.resize((1024, 533))
