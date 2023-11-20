@@ -92,13 +92,7 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="./checkpoints/baseline",
         help="The output directory where the model predictions and checkpoints will be written.",
-    )
-    parser.add_argument(
-        "--logging_dir",
-        type=str,
-        default="./logs",
     )
     parser.add_argument(
         "--mixed_precision",
@@ -131,14 +125,9 @@ def parse_args():
 
 def main():
     args, cfg = parse_args()
-    logging_dir = Path(args.output_dir, args.logging_dir)
-
-    accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
-
     accelerator = Accelerator(
         gradient_accumulation_steps=cfg.TRAIN.GRADIENT_ACCUMULATION_STEP,
         mixed_precision=args.mixed_precision,
-        project_config=accelerator_project_config,
     )
 
     # Make one log on every process with the configuration for debugging.
@@ -159,11 +148,6 @@ def main():
     # If passed along, set the training seed now.
     if cfg.TRAIN.SEED is not None:
         set_seed(cfg.TRAIN.SEED)
-
-    # Handle the repository creation
-    if accelerator.is_main_process:
-        if args.output_dir is not None:
-            os.makedirs(args.output_dir, exist_ok=True)
 
     # Val
     accelerator.wait_for_everyone()
@@ -233,24 +217,11 @@ def main():
     )
 
     # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint:
-        if args.resume_from_checkpoint != "latest":
-            path = os.path.basename(args.resume_from_checkpoint)
-        else:
-            # Get the most recent checkpoint
-            dirs = os.listdir(args.output_dir)
-            dirs = [d for d in dirs if d.startswith("checkpoint")]
-            dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
-            path = dirs[-1] if len(dirs) > 0 else None
+    accelerator.print(f"Resuming from checkpoint {args.resume_from_checkpoint}")
+    accelerator.load_state(args.resume_from_checkpoint)
 
-        if path is None:
-            accelerator.print(
-                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
-            )
-            args.resume_from_checkpoint = None
-        else:
-            accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(args.output_dir, path))
+    # Create save dir
+    os.makedirs(args.output_dir, exist_ok=True)
    
     if accelerator.is_main_process:
         logger.info(
