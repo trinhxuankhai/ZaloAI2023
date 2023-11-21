@@ -191,10 +191,14 @@ class BannerDatasetv2(Dataset):
                 
                 root = os.path.join(self.data_dir, "train", "craw_images", image_id)
                 for path in os.listdir(root):
+                    try:
+                        test = default_loader(os.path.join(root, path))
+                    except:
+                        continue
                     data.append(dict(caption=caption, 
-                                 description=description,
-                                 moreInfo=moreInfo,
-                                 image_path=os.path.join(root, path)))
+                                    description=description,
+                                    moreInfo=moreInfo,
+                                    image_path=os.path.join(root, path)))
         self.data = data
 
     def __len__(self):
