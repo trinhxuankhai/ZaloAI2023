@@ -1,6 +1,6 @@
 import torch
 from torchvision import transforms
-from .dataset import BannerDataset, train_collate_fn, test_collate_fn
+from .dataset import BannerDataset, BannerDatasetv2, train_collate_fn, test_collate_fn
 from .random_aug import RandAugment
 
 def build_dataloader(cfg, tokenizer):
@@ -21,8 +21,12 @@ def build_dataloader(cfg, tokenizer):
             transforms.ToTensor(),
         ]
     )
-
-    train_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=cond_train_transform, mode="train")
+    
+    if cfg.DATA.CRAWL_IMAGES:
+        train_dataset = BannerDatasetv2(cfg.DATA, tokenizer, transform=train_transform, mode="train")
+    else:
+        train_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=cond_train_transform, mode="train")
+    
     test_dataset = BannerDataset(cfg.DATA, tokenizer, transform=None, cond_transform=None, mode="test")
     # val_dataset = BannerDataset(cfg.DATA, tokenizer, transform=train_transform, cond_transform=None, mode="val")
     val_dataset = torch.utils.data.Subset(test_dataset, list(range(265, 275)))

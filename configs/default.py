@@ -21,6 +21,7 @@ _C.DATA.RANDOM_AUG = False
 _C.DATA.COND_IMAGES = False
 _C.DATA.FONT = 'fonts/BeVietnam-Bold.ttf'
 _C.DATA.FONT_SIZE = 36
+_C.DATA.CRAWL_IMAGES = False
 
 # Model specific configurations.
 _C.MODEL = CN()
