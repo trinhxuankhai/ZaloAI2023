@@ -107,6 +107,7 @@ def main():
     sim_model = SentenceTransformer('bkai-foundation-models/vietnamese-bi-encoder')
     test_data = pd.read_csv("./data/test/info.csv")
     train_data = pd.read_csv("./data/train/info.csv")
+    train_data_trans = pd.read_csv("./data/train/info_trans.csv")
     test_data_trans = pd.read_csv("./data/test/info_trans.csv")
 
     # Load captions
@@ -234,28 +235,47 @@ def main():
         if cfg.TRAIN.SEED is not None:
             generator = generator.manual_seed(cfg.TRAIN.SEED)
         
+        # bs = 2
+        # data_len = len(test_data_trans)
+        # for i in tqdm(range(0, data_len, bs)):
+        #     prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
+        #     descriptions = test_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
+        #     moreInfos = test_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
+
+        #     for k in range(len(prompts)):
+        #         prompts[k] = prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
+                
+        #     init_image_paths = []
+        #     save_paths = []
+        #     for j in range(i, min(i+bs, data_len)):
+        #         init_image_paths.append(train_data.iloc[int(indices[j])]["bannerImage"])
+        #         save_paths.append(os.path.join(args.output_dir, test_data_trans.iloc[j]["bannerImage"]))
+
+        #     init_images = []
+        #     for init_image_path in init_image_paths:
+        #         init_image = load_image(os.path.join('./data/train/images', init_image_path))
+        #         init_images.append(init_image)
+
+        #     images = pipeline(prompts, generator=generator, height=536, width=1024).images
+            
+        #     for image, save_path in zip(images, save_paths):
+        #         image = image.resize((1024, 533))
+        #         image.save(save_path)
+
         bs = 2
-        data_len = len(test_data_trans)
+        data_len = len(train_data_trans)
         for i in tqdm(range(0, data_len, bs)):
-            prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
-            descriptions = test_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
-            moreInfos = test_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
+            prompts = train_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
+            descriptions = train_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
+            moreInfos = train_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
 
             for k in range(len(prompts)):
                 prompts[k] = prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
                 
-            init_image_paths = []
             save_paths = []
             for j in range(i, min(i+bs, data_len)):
-                init_image_paths.append(train_data.iloc[int(indices[j])]["bannerImage"])
-                save_paths.append(os.path.join(args.output_dir, test_data_trans.iloc[j]["bannerImage"]))
+                save_paths.append(os.path.join(args.output_dir, train_data_trans.iloc[j]["bannerImage"]))
 
-            init_images = []
-            for init_image_path in init_image_paths:
-                init_image = load_image(os.path.join('./data/train/images', init_image_path))
-                init_images.append(init_image)
-
-            # images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=30, strength=args.strength, height=536, width=1024).images
             images = pipeline(prompts, generator=generator, height=536, width=1024).images
             
             for image, save_path in zip(images, save_paths):
