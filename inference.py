@@ -152,7 +152,7 @@ def main():
             
         init_images = []
         for init_image_path in init_image_paths:
-            init_image = load_image(init_image_path)
+            init_image = load_image(init_image_path).resize((1024, 536))
             init_images.append(init_image)
 
         images = pipeline(prompts, image=init_images, 
