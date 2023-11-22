@@ -9,3 +9,5 @@ sentence-transformers
 omegaconf
 open_clip_torch
 clip-interrogator
+yacs
+underthesea
