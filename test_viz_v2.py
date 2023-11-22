@@ -6,8 +6,6 @@ from tqdm import tqdm
 
 import torch
 import torch.utils.checkpoint
-import torch.nn.functional as F
-from datasets.build import build_dataloader
 
 from accelerate import Accelerator
 from accelerate.logging import get_logger
@@ -19,10 +17,9 @@ from transformers import CLIPTextModel, CLIPTokenizer
 from sentence_transformers import SentenceTransformer
 
 import diffusers
-from diffusers.utils import load_image
 from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
-from diffusers import AutoencoderKL, AutoPipelineForImage2Image, UNet2DConditionModel, DiffusionPipeline
+from diffusers import AutoencoderKL, EulerAncestralDiscreteScheduler, UNet2DConditionModel, DiffusionPipeline
 
 from configs.default import get_default_config
 
@@ -195,14 +192,11 @@ def main():
     text_lora_parameters = LoraLoaderMixin._modify_text_encoder(
         text_encoder, dtype=torch.float32, rank=cfg.MODEL.RANK
     )
-    
-    # DataLoaders creation:
-    train_dataloader, test_dataloader, val_dataloader = build_dataloader(cfg, tokenizer)
 
 
     # Prepare everything with our `accelerator`.
-    lora_layers, text_encoder, train_dataloader, test_dataloader, val_dataloader = accelerator.prepare(
-        lora_layers, text_encoder, train_dataloader, test_dataloader, val_dataloader
+    lora_layers, text_encoder = accelerator.prepare(
+        lora_layers, text_encoder
     )
 
     # Potentially load in the weights and states from a previous save
@@ -228,6 +222,9 @@ def main():
             torch_dtype=weight_dtype,
         )
         pipeline = pipeline.to(accelerator.device)
+        pipeline.scheduler = EulerAncestralDiscreteScheduler(
+                beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
+            )
         pipeline.set_progress_bar_config(disable=True)
 
         # run inference
@@ -276,7 +273,7 @@ def main():
             for j in range(i, min(i+bs, data_len)):
                 save_paths.append(os.path.join(args.output_dir, train_data_trans.iloc[j]["bannerImage"]))
 
-            images = pipeline(prompts, generator=generator, height=536, width=1024).images
+            images = pipeline(prompts, generator=generator, num_inference_steps=30, height=536, width=1024).images
             
             for image, save_path in zip(images, save_paths):
                 image = image.resize((1024, 533))
