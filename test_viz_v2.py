@@ -119,28 +119,28 @@ def main():
     for i in tqdm(range(len(train_data))):
         train_captions.append(train_data.iloc[i]["caption"])
 
-    # Extract embeddings
-    test_embeds = []
-    for test_caption in tqdm(test_captions):
-        sample = torch.from_numpy(sim_model.encode([test_caption], show_progress_bar=False))
-        test_embeds.append(sample)
+    # # Extract embeddings
+    # test_embeds = []
+    # for test_caption in tqdm(test_captions):
+    #     sample = torch.from_numpy(sim_model.encode([test_caption], show_progress_bar=False))
+    #     test_embeds.append(sample)
 
-    train_embeds = []
-    for train_caption in tqdm(train_captions):
-        sample = torch.from_numpy(sim_model.encode([train_caption], show_progress_bar=False))
-        train_embeds.append(sample)
+    # train_embeds = []
+    # for train_caption in tqdm(train_captions):
+    #     sample = torch.from_numpy(sim_model.encode([train_caption], show_progress_bar=False))
+    #     train_embeds.append(sample)
 
-    test_embeds = torch.cat(test_embeds, dim=0)
-    train_embeds = torch.cat(train_embeds, dim=0)
+    # test_embeds = torch.cat(test_embeds, dim=0)
+    # train_embeds = torch.cat(train_embeds, dim=0)
 
-    test_embeds = F.normalize(test_embeds, dim=1, p=2)
-    train_embeds = F.normalize(train_embeds, dim=1, p=2)
+    # test_embeds = F.normalize(test_embeds, dim=1, p=2)
+    # train_embeds = F.normalize(train_embeds, dim=1, p=2)
 
-    # Calculate similarity 
-    similarity = torch.mm(test_embeds, train_embeds.t())
-    _, indices = torch.topk(
-        similarity, k=1, dim=1, largest=True, sorted=True
-    )  # q * topk
+    # # Calculate similarity 
+    # similarity = torch.mm(test_embeds, train_embeds.t())
+    # _, indices = torch.topk(
+    #     similarity, k=1, dim=1, largest=True, sorted=True
+    # )  # q * topk
     ###################################################################
 
     # Load scheduler, tokenizer and models.
