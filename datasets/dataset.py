@@ -70,7 +70,7 @@ class BannerDataset(Dataset):
         caption = sample['caption'] + ', description is ' + sample['description'] + ' and more information is ' + sample['moreInfo']
         
         if self.mode == "train" or self.mode == "val":
-            caption = self.train_caption[sample["bannerImage"]] 
+            caption = self.train_caption[sample["bannerImage"]][0]
 
             # Load image
             image = default_loader(os.path.join(self.data_dir, "train", "images/", sample["bannerImage"]))
