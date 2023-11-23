@@ -480,7 +480,7 @@ def main():
                     save_paths.append(os.path.join(args.output_dir, train_data_trans.iloc[j]["bannerImage"]))
                     prompts.append(train_caption[train_data_trans.iloc[j]["bannerImage"]])
 
-                print(prompts)
+                    print(train_caption[train_data_trans.iloc[j]["bannerImage"]])
 
                 images = pipeline(prompts, generator=generator, num_inference_steps=30, height=536, width=1024).images
                 
