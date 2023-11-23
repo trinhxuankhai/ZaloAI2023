@@ -459,9 +459,9 @@ def main():
                 torch_dtype=weight_dtype,
             )
             pipeline = pipeline.to(accelerator.device)
-            pipeline.scheduler = EulerAncestralDiscreteScheduler(
-                beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
-            )
+            # pipeline.scheduler = EulerAncestralDiscreteScheduler(
+            #     beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
+            # )
             pipeline.set_progress_bar_config(disable=True)
 
             # run inference
