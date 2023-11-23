@@ -182,7 +182,8 @@ def main():
     text_encoder = CLIPTextModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
     )
-    vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
+    # vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
+    vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)
     unet = UNet2DConditionModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="unet", revision=args.revision
     )
