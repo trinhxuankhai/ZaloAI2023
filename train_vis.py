@@ -33,7 +33,7 @@ from diffusers.optimization import get_scheduler
 from diffusers.training_utils import compute_snr
 from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
-from diffusers import AutoencoderKL, DDPMScheduler, AutoPipelineForImage2Image, UNet2DConditionModel
+from diffusers import AutoencoderKL, DDPMScheduler, AutoPipelineForImage2Image, EulerAncestralDiscreteScheduler, UNet2DConditionModel, DiffusionPipeline
 
 from configs.default import get_default_config
 
@@ -210,6 +210,7 @@ def main():
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
         test_data, train_data, test_data_trans, indices = preprocess_val()
+        train_data_trans = pd.read_csv("./data/train/info_trans.csv")
 
     # Load scheduler, tokenizer and models.
     noise_scheduler = DDPMScheduler.from_pretrained(cfg.MODEL.NAME, subfolder="scheduler")
@@ -485,7 +486,8 @@ def main():
             )
             
             # create pipeline
-            pipeline = AutoPipelineForImage2Image.from_pretrained(
+            # pipeline = AutoPipelineForImage2Image.from_pretrained(
+            pipeline = DiffusionPipeline.from_pretrained(
                 cfg.MODEL.NAME,
                 vae=vae.to(weight_dtype),
                 tokenizer=tokenizer,
@@ -495,6 +497,9 @@ def main():
                 torch_dtype=weight_dtype,
             )
             pipeline = pipeline.to(accelerator.device)
+            pipeline.scheduler = EulerAncestralDiscreteScheduler(
+                beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
+            )
             pipeline.set_progress_bar_config(disable=True)
 
             # run inference
@@ -502,31 +507,51 @@ def main():
             if cfg.TRAIN.SEED is not None:
                 generator = generator.manual_seed(cfg.TRAIN.SEED)
             
-            bs = 4
-            start = 245
-            data_len = 255 
+            # bs = 4
+            # start = 245
+            # data_len = 255 
             total_images = []
             total_captions = []
-            for i in tqdm(range(start, data_len, bs)):
-                prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
-                descriptions = test_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
-                moreInfos = test_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
+            # for i in tqdm(range(start, data_len, bs)):
+            #     prompts = test_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
+            #     descriptions = test_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
+            #     moreInfos = test_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
+
+            #     for k in range(len(prompts)):
+            #         prompts[k] = prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
+                    
+            #     init_image_paths = []
+            #     save_paths = []
+            #     for j in range(i, min(i+bs, data_len)):
+            #         init_image_paths.append(train_data.iloc[int(indices[j])]["bannerImage"])
+            #         save_paths.append(os.path.join(args.output_dir, test_data_trans.iloc[j]["bannerImage"]))
+
+            #     init_images = []
+            #     for init_image_path in init_image_paths:
+            #         init_image = load_image(os.path.join('./data/train/images', init_image_path))
+            #         init_images.append(init_image)
+
+            #     images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=30, strength=0.7, height=536, width=1024).images
+                
+            #     for image, prompt in zip(images, prompts):
+            #         total_images.append(image)
+            #         total_captions.append(prompt)
+
+            bs = 1
+            data_len = len(train_data_trans)
+            for i in tqdm([972, 1343, 1205, 54, 950, 1042]):
+                prompts = train_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
+                descriptions = train_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
+                moreInfos = train_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
 
                 for k in range(len(prompts)):
                     prompts[k] = prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
                     
-                init_image_paths = []
                 save_paths = []
                 for j in range(i, min(i+bs, data_len)):
-                    init_image_paths.append(train_data.iloc[int(indices[j])]["bannerImage"])
-                    save_paths.append(os.path.join(args.output_dir, test_data_trans.iloc[j]["bannerImage"]))
+                    save_paths.append(os.path.join(args.output_dir, train_data_trans.iloc[j]["bannerImage"]))
 
-                init_images = []
-                for init_image_path in init_image_paths:
-                    init_image = load_image(os.path.join('./data/train/images', init_image_path))
-                    init_images.append(init_image)
-
-                images = pipeline(prompts, image=init_images, generator=generator, num_inference_steps=30, strength=0.7, height=536, width=1024).images
+                images = pipeline(prompts, generator=generator, num_inference_steps=30, height=536, width=1024).images
                 
                 for image, prompt in zip(images, prompts):
                     total_images.append(image)
