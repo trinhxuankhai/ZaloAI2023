@@ -271,8 +271,8 @@ def main():
 
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
-    if accelerator.is_main_process:
-        accelerator.init_trackers("text2image-fine-tune", config=vars(args))
+    # if accelerator.is_main_process:
+    #     accelerator.init_trackers("text2image-fine-tune", config=vars(args))
 
     # Train!
     total_batch_size = cfg.TRAIN.BATCH_SIZE * accelerator.num_processes * cfg.TRAIN.GRADIENT_ACCUMULATION_STEP
@@ -480,7 +480,7 @@ def main():
                     save_paths.append(os.path.join(args.output_dir, train_data_trans.iloc[j]["bannerImage"]))
                     prompts.append(train_caption[train_data_trans.iloc[j]["bannerImage"]])
 
-                    print(train_caption[train_data_trans.iloc[j]["bannerImage"]])
+                    print(type(train_caption[train_data_trans.iloc[j]["bannerImage"]]))
 
                 images = pipeline(prompts, generator=generator, num_inference_steps=30, height=536, width=1024).images
                 
