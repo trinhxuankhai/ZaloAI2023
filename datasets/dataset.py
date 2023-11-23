@@ -52,7 +52,7 @@ class BannerDataset(Dataset):
         self.data_csv_path = data_cfg.TRAIN_CSV_PATH if (mode == "train" or mode == "val") else data_cfg.TEST_CSV_PATH
         self.data = pd.read_csv(os.path.join(self.data_dir, self.data_csv_path))
 
-        with open(os.path.join(self.data_dir, "train", "train_caption_v2.json"), 'r') as f:
+        with open(os.path.join(self.data_dir, "train", "train_caption_v3.json"), 'r') as f:
             self.train_caption = json.load(f)
 
     def __len__(self):
