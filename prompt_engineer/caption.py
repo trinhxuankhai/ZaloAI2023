@@ -53,15 +53,9 @@ class Prompt:
             output = output.split('\n')[0].strip()
             outputs[cap_id] = output
 
-            print(prompt)
-            print(output)
-
-            if i > 5:
-                break
-            
-        # if output_path:
-        #     with open(output_path, 'w') as f:
-        #         json.dump(outputs, f, indent=4)
+        if output_path:
+            with open(output_path, 'w') as f:
+                json.dump(outputs, f, indent=4)
         return outputs
     
     def generate_ad_object(self, input_path:str="data/test_info.csv", output_path:str="prompt_engineer/result/object.json"):
@@ -109,5 +103,5 @@ class Prompt:
 
 if __name__ == "__main__":
     prompt_eng = Prompt(origin_file="data/train/info_trans.csv", augument_file="data/train/train_caption_v3.json")
-    output = prompt_eng.create_explicit_prompt(input_path="data/test/info_trans.csv", output_path="data/test/explicit_prompt.json")
+    output = prompt_eng.create_explicit_prompt(input_path="data/test/info_trans.csv", output_path="data/test/explicit_prompt_v3.json")
     # output = prompt_eng.generate_ad_object(input_path="path to csv file want to create know object ad is about", output_path="save result path, if set to None it will not save the result")
