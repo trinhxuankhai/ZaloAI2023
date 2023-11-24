@@ -34,18 +34,18 @@ class Prompt:
             caption_embed = self.sentence_embed_model.encode([caption], convert_to_tensor=True)
             similar_scores = torch.nn.functional.cosine_similarity(caption_embed, self.caption_embeds)[0]
             print(similar_scores)
-            sort_index = torch.argsort(similar_scores, dim=-1)[:2]
-            fewshot_in0 = self.cut_long_sentence(self.origin_caption["caption"][sort_index[0]])
-            fewshot_in1 = self.cut_long_sentence(self.origin_caption["caption"][sort_index[1]])
-            fewshot_out0 = self.cut_long_sentence(self.augument_caption[self.origin_caption["bannerImage"][sort_index[0]]])
-            fewshot_out1 = self.cut_long_sentence(self.augument_caption[self.origin_caption["bannerImage"][sort_index[1]]])
-            prompt = f"Describe the advertisement image from the following advertisement sentence\n\nAdvertisement: {fewshot_in0}\nAdvertisement description: {fewshot_out0}\n\nAdvertisement: {fewshot_in1}\nAdvertisement description: {fewshot_out1}\n\nAdvertisement: {caption}\nAdvertisement photo description:"
-            output = self.llm(prompt, stream=False)
-            output = output.split('\n')[0].strip()
-            outputs[cap_id] = output
-        if output_path:
-            with open(output_path, 'w') as f:
-                json.dump(outputs, f, indent=4)
+        #     sort_index = torch.argsort(similar_scores, dim=-1)[:2]
+        #     fewshot_in0 = self.cut_long_sentence(self.origin_caption["caption"][sort_index[0]])
+        #     fewshot_in1 = self.cut_long_sentence(self.origin_caption["caption"][sort_index[1]])
+        #     fewshot_out0 = self.cut_long_sentence(self.augument_caption[self.origin_caption["bannerImage"][sort_index[0]]])
+        #     fewshot_out1 = self.cut_long_sentence(self.augument_caption[self.origin_caption["bannerImage"][sort_index[1]]])
+        #     prompt = f"Describe the advertisement image from the following advertisement sentence\n\nAdvertisement: {fewshot_in0}\nAdvertisement description: {fewshot_out0}\n\nAdvertisement: {fewshot_in1}\nAdvertisement description: {fewshot_out1}\n\nAdvertisement: {caption}\nAdvertisement photo description:"
+        #     output = self.llm(prompt, stream=False)
+        #     output = output.split('\n')[0].strip()
+        #     outputs[cap_id] = output
+        # if output_path:
+        #     with open(output_path, 'w') as f:
+        #         json.dump(outputs, f, indent=4)
         return outputs
     
     def generate_ad_object(self, input_path:str="data/test_info.csv", output_path:str="prompt_engineer/result/object.json"):
