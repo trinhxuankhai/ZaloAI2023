@@ -19,7 +19,7 @@ class Prompt:
             self.augument_caption = json.load(f)
         self.origin_caption = pd.read_csv(origin_file)
         # if not os.path.exists(r'prompt_engineer/prompt_tensor'):
-        os.mkdirs('prompt_engineer/prompt_tensor', exist_ok=True)
+        os.makedirs('prompt_engineer/prompt_tensor', exist_ok=True)
         self.create_tensor()
         self.caption_embeds = torch.load('prompt_engineer/prompt_tensor/prompt_tensor.pt')
 
