@@ -87,6 +87,6 @@ class Prompt:
             return sentence
 
 if __name__ == "__main__":
-    prompt_eng = Prompt()
+    prompt_eng = Prompt(origin_file="data/train/info_trans.csv", augument_file="data/train/train_caption_v3.json")
     output = prompt_eng.create_explicit_prompt(input_path="data/test/info_trans.csv", output_path="data/test/explicit_prompt.json")
     # output = prompt_eng.generate_ad_object(input_path="path to csv file want to create know object ad is about", output_path="save result path, if set to None it will not save the result")
