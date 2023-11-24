@@ -11,7 +11,7 @@ class Prompt:
     def __init__(
             self,
             origin_file:str="data/info.csv",
-            augument_file:str="data/train_caption.json"
+            augument_file:str="data/train_caption_v3.json"
     ):
         self.translator = googletrans.Translator()
         config = {'max_new_tokens': 77, 'repetition_penalty': 1.2, 'temperature': 0.9, 'stream': False, 'context_length':1024, 'top_k':150, 'top_p':0.95}
