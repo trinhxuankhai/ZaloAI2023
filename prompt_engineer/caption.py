@@ -33,7 +33,8 @@ class Prompt:
         for caption, cap_id in tqdm(zip(captions, ids)):
             caption_embed = self.sentence_embed_model.encode([caption], convert_to_tensor=True)
             similar_scores = torch.nn.functional.cosine_similarity(caption_embed, self.caption_embeds)[0]
-            sort_index = torch.argsort(similar_scores, dim=-1)[::-1][:2]
+            print(similar_scores)
+            sort_index = torch.argsort(similar_scores, dim=-1)[:2]
             fewshot_in0 = self.cut_long_sentence(self.origin_caption["caption"][sort_index[0]])
             fewshot_in1 = self.cut_long_sentence(self.origin_caption["caption"][sort_index[1]])
             fewshot_out0 = self.cut_long_sentence(self.augument_caption[self.origin_caption["bannerImage"][sort_index[0]]])
