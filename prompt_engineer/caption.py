@@ -34,8 +34,11 @@ class Prompt:
             caption_embed = self.sentence_embed_model.encode([caption], convert_to_tensor=True)
             similar_scores = torch.nn.functional.cosine_similarity(caption_embed, self.caption_embeds)
             sort_index = torch.argsort(similar_scores, descending=True, dim=-1)[:2]
-            fewshot_in0 = self.cut_long_sentence(self.origin_caption.iloc[int(sort_index[0])]["caption"])
-            fewshot_in1 = self.cut_long_sentence(self.origin_caption.iloc[int(sort_index[1])]["caption"])
+            sample_1 = self.origin_caption.iloc[int(sort_index[0])]
+            sample_2 = self.origin_caption.iloc[int(sort_index[1])]
+
+            fewshot_in0 = self.cut_long_sentence(sample_1["caption"].strip('.') + '. ' + sample_1["description"] + '. ' + sample_1["moreInfo"])
+            fewshot_in1 = self.cut_long_sentence(sample_2["caption"].strip('.') + '. ' + sample_2["description"] + '. ' + sample_2["moreInfo"])
             fewshot_out0 = self.cut_long_sentence(self.augument_caption[self.origin_caption.iloc[int(sort_index[0])]["bannerImage"]])
             fewshot_out1 = self.cut_long_sentence(self.augument_caption[self.origin_caption.iloc[int(sort_index[1])]["bannerImage"]])
             prompt = f"Describe the advertisement image from the following advertisement sentence\n\nAdvertisement: {fewshot_in0}\nAdvertisement description: {fewshot_out0}\n\nAdvertisement: {fewshot_in1}\nAdvertisement description: {fewshot_out1}\n\nAdvertisement: {caption}\nAdvertisement photo description:"
