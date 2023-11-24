@@ -35,7 +35,7 @@ class Prompt:
         for i in tqdm(range(len(input_data))):
             sample = input_data.iloc[i]
             cap_id = sample['bannerImage']
-            caption = sample["caption"].strip('.') + '. ' + sample["description"].strip('.') + '. ' + sample["moreInfo"].strip('.') + '.'
+            caption = sample["caption"].strip('.') + '. ' + sample["description"].strip('.') + '.'
             
             caption_embed = self.sentence_embed_model.encode([caption], convert_to_tensor=True)
             similar_scores = torch.nn.functional.cosine_similarity(caption_embed, self.caption_embeds)
@@ -43,8 +43,8 @@ class Prompt:
             sample_1 = self.origin_caption.iloc[int(sort_index[0])]
             sample_2 = self.origin_caption.iloc[int(sort_index[1])]
 
-            fewshot_in0 = self.cut_long_sentence(sample_1["caption"].strip('.') + '. ' + sample_1["description"] + '. ' + sample_1["moreInfo"])
-            fewshot_in1 = self.cut_long_sentence(sample_2["caption"].strip('.') + '. ' + sample_2["description"] + '. ' + sample_2["moreInfo"])
+            fewshot_in0 = self.cut_long_sentence(sample_1["caption"].strip('.') + '. ' + sample_1["description"] + '.')
+            fewshot_in1 = self.cut_long_sentence(sample_2["caption"].strip('.') + '. ' + sample_2["description"] + '.')
             fewshot_out0 = self.cut_long_sentence(self.augument_caption[self.origin_caption.iloc[int(sort_index[0])]["bannerImage"]])
             fewshot_out1 = self.cut_long_sentence(self.augument_caption[self.origin_caption.iloc[int(sort_index[1])]["bannerImage"]])
                         
@@ -85,7 +85,7 @@ class Prompt:
         prompts = []
         for i in range(len(self.origin_caption)):
             sample = self.origin_caption.iloc[i]
-            prompt = sample["caption"].strip('.') + '. ' + sample["description"].strip('.') + '. ' + sample["moreInfo"].strip('.') + '.'
+            prompt = sample["caption"].strip('.') + '. ' + sample["description"].strip('.') + '.'
             prompts.append(prompt)
         embed_tensor = self.sentence_embed_model.encode(prompts, convert_to_tensor=True)
         torch.save(embed_tensor, 'prompt_engineer/prompt_tensor/prompt_tensor.pt')
