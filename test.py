@@ -196,7 +196,7 @@ def main():
 
         for save_path, prompt in tqdm(explicit_prompt.items()):
             save_path = os.path.join(args.output_dir, save_path)
-            image = pipeline(prompt, generator=generator, height=536, width=1024).images[0]
+            image = pipeline(prompt, generator=generator, num_inference_steps=30, height=536, width=1024).images[0]
             image = image.resize((1024, 533))
             image.save(save_path)
 
