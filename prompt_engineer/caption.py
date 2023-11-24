@@ -55,7 +55,9 @@ class Prompt:
 
             print(prompt)
             print(output)
-            break
+
+            if i > 5:
+                break
             
         # if output_path:
         #     with open(output_path, 'w') as f:
