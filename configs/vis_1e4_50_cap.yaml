@@ -9,11 +9,11 @@ MODEL:
   VAE: "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors"
 
 TRAIN:
-  EPOCH: 40
+  EPOCH: 50
   BATCH_SIZE: 6
   LR:
     MODE: 'cosine'
-    BASE_LR : 1e-5
+    BASE_LR : 1e-4
 
 EVAL:
   EPOCH: 1

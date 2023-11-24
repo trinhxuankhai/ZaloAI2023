@@ -182,7 +182,8 @@ def main():
     text_encoder = CLIPTextModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
     )
-    vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
+    # vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
+    vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)
     unet = UNet2DConditionModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="unet", revision=args.revision
     )
@@ -458,9 +459,9 @@ def main():
                 torch_dtype=weight_dtype,
             )
             pipeline = pipeline.to(accelerator.device)
-            pipeline.scheduler = EulerAncestralDiscreteScheduler(
-                beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
-            )
+            # pipeline.scheduler = EulerAncestralDiscreteScheduler(
+            #     beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
+            # )
             pipeline.set_progress_bar_config(disable=True)
 
             # run inference
