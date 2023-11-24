@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import argparse
 import pandas as pd
@@ -101,7 +102,8 @@ def main():
         set_seed(cfg.TRAIN.SEED)
 
     ####################################################################
-    train_data_trans = pd.read_csv("./data/train/info_trans.csv")
+    with open('./data/test/explicit_prompt_v3.json', 'r') as f:
+        explicit_prompt = json.load(f)
 
     # Load scheduler, tokenizer and models.
     tokenizer = CLIPTokenizer.from_pretrained(
@@ -192,25 +194,11 @@ def main():
         if cfg.TRAIN.SEED is not None:
             generator = generator.manual_seed(cfg.TRAIN.SEED)
 
-        bs = 2
-        data_len = len(train_data_trans)
-        for i in tqdm(range(0, data_len, bs)):
-            prompts = train_data_trans.iloc[i:min(i+bs, data_len)]["caption"].tolist()
-            descriptions = train_data_trans.iloc[i:min(i+bs, data_len)]["description"].tolist()
-            moreInfos = train_data_trans.iloc[i:min(i+bs, data_len)]["moreInfo"].tolist()
-
-            for k in range(len(prompts)):
-                prompts[k] = prompts[k] + ', description is ' + descriptions[k] + ' and more information is ' + moreInfos[k]
-                
-            save_paths = []
-            for j in range(i, min(i+bs, data_len)):
-                save_paths.append(os.path.join(args.output_dir, train_data_trans.iloc[j]["bannerImage"]))
-
-            images = pipeline(prompts, generator=generator, num_inference_steps=30, height=536, width=1024).images
-            
-            for image, save_path in zip(images, save_paths):
-                image = image.resize((1024, 533))
-                image.save(save_path)
+        for save_path, prompt in tqdm(explicit_prompt.items()):
+            save_path = os.path.join(args.output_dir, save_path)
+            image = pipeline(prompt, generator=generator, height=536, width=1024).images[0]
+            image = image.resize((1024, 533))
+            image.save(save_path)
 
 if __name__ == "__main__":
     main()
