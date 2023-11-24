@@ -1,7 +1,6 @@
 import torch
 from ctransformers import AutoModelForCausalLM
 from sentence_transformers import SentenceTransformer
-import googletrans
 import pandas as pd
 import json
 import os
@@ -10,10 +9,9 @@ from tqdm import tqdm
 class Prompt:
     def __init__(
             self,
-            origin_file:str="data/info.csv",
-            augument_file:str="data/train_caption_v3.json"
+            origin_file:str="data/train/info_trans.csv",
+            augument_file:str="data/train/train_caption_v3.json"
     ):
-        self.translator = googletrans.Translator()
         config = {'max_new_tokens': 77, 'repetition_penalty': 1.2, 'temperature': 0.9, 'stream': False, 'context_length':1024, 'top_k':150, 'top_p':0.95}
         self.sentence_embed_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
         self.llm = AutoModelForCausalLM.from_pretrained("TheBloke/Amethyst-13B-Mistral-GGUF", model_file="amethyst-13b-mistral.Q4_K_M.gguf", model_type="llama", gpu_layers=50, **config)
@@ -25,7 +23,7 @@ class Prompt:
             self.create_tensor()
         self.caption_embeds = torch.load('prompt_engineer/prompt_tensor/prompt_tensor.pt')
 
-    def create_explicit_prompt(self, input_path:str="data/test_info.csv", output_path:str="prompt_engineer/result/explicit_prompt.json"):
+    def create_explicit_prompt(self, input_path:str="data/test/info_trans.csv", output_path:str="prompt_engineer/result/explicit_prompt.json"):
         '''
         the input path must be csv data type have the same format with origin file
         the origin caption containt implicit description for image so this function will use LLM to generate explicit description to generate image by SD model
@@ -36,8 +34,8 @@ class Prompt:
             caption_embed = self.sentence_embed_model.encode([caption], convert_to_tensor=True)
             similar_scores = torch.nn.functional.cosine_similarity(caption_embed, self.caption_embeds)[0]
             sort_index = torch.argsort(similar_scores, dim=-1)[::-1][:2]
-            fewshot_in0 = self.cut_long_sentence(self.translator.translate(self.origin_caption["caption"][sort_index[0]], src='vi', dest='en').text)
-            fewshot_in1 = self.cut_long_sentence(self.translator.translate(self.origin_caption["caption"][sort_index[1]], src='vi', dest='en').text)
+            fewshot_in0 = self.cut_long_sentence(self.origin_caption["caption"][sort_index[0]])
+            fewshot_in1 = self.cut_long_sentence(self.origin_caption["caption"][sort_index[1]])
             fewshot_out0 = self.cut_long_sentence(self.augument_caption[self.origin_caption["bannerImage"][sort_index[0]]])
             fewshot_out1 = self.cut_long_sentence(self.augument_caption[self.origin_caption["bannerImage"][sort_index[1]]])
             prompt = f"Describe the advertisement image from the following advertisement sentence\n\nAdvertisement: {fewshot_in0}\nAdvertisement description: {fewshot_out0}\n\nAdvertisement: {fewshot_in1}\nAdvertisement description: {fewshot_out1}\n\nAdvertisement: {caption}\nAdvertisement photo description:"
@@ -89,6 +87,6 @@ class Prompt:
             return sentence
 
 if __name__ == "__main__":
-    prompt_eng = Prompt(origin_file="path to origin train file info.csv", augument_file="path to augument caption file used to make few shot for caption prompt if it set to None it will not save output")
-    output = prompt_eng.create_explicit_prompt(input_path="path to csv file want to create augument prompt", output_path="save result path, if it set to None it will not save output")
-    output = prompt_eng.generate_ad_object(input_path="path to csv file want to create know object ad is about", output_path="save result path, if set to None it will not save the result")
+    prompt_eng = Prompt()
+    output = prompt_eng.create_explicit_prompt(input_path="data/test/info_trans.csv", output_path="data/test/explicit_prompt.json")
+    # output = prompt_eng.generate_ad_object(input_path="path to csv file want to create know object ad is about", output_path="save result path, if set to None it will not save the result")
