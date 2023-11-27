@@ -190,10 +190,10 @@ def main():
             revision=args.revision,
             torch_dtype=weight_dtype,
         )
-        if args.prediction_type == "v_prediction":
-            pipeline.scheduler = DDIMScheduler.from_config(
-                pipeline.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing"
-            )
+        # if args.prediction_type == "v_prediction":
+        #     pipeline.scheduler = DDIMScheduler.from_config(
+        #         pipeline.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing"
+        #     )
         pipeline = pipeline.to(accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 
