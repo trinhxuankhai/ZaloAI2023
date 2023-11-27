@@ -1,0 +1,18 @@
+DATA:
+  RESOLUTION: 512
+  CENTER_CROP: True
+  RANDOM_FLIP: False
+  RANDOM_AUG: False
+
+MODEL:
+  NAME: 'runwayml/stable-diffusion-v1-5'
+
+TRAIN:
+  EPOCH: 10
+  BATCH_SIZE: 6
+  LR:
+    MODE: 'cosine'
+    BASE_LR : 1e-6
+
+EVAL:
+  EPOCH: 1
