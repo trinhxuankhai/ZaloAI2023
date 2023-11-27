@@ -9,7 +9,8 @@ MODEL:
 
 TRAIN:
   EPOCH: 50
-  BATCH_SIZE: 2
+  BATCH_SIZE: 1
+  GRADIENT_ACCUMULATION_STEP: 8
   LR:
     MODE: 'cosine'
     BASE_LR : 1e-4
