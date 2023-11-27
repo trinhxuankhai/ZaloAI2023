@@ -106,7 +106,7 @@ def main():
         set_seed(cfg.TRAIN.SEED)
 
     ####################################################################
-    with open('./data/test/explicit_prompt_v3.json', 'r') as f:
+    with open('./data/test/llava_prompt.json', 'r') as f:
         explicit_prompt = json.load(f)
 
     # Load scheduler, tokenizer and models.
