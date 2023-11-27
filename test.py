@@ -190,10 +190,10 @@ def main():
             revision=args.revision,
             torch_dtype=weight_dtype,
         )
-        # if args.prediction_type == "v_prediction":
-        #     pipeline.scheduler = DDIMScheduler.from_config(
-        #         pipeline.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing"
-        #     )
+        if args.prediction_type == "v_prediction":
+            pipeline.scheduler = DDIMScheduler.from_config(
+                pipeline.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing"
+            )
         pipeline = pipeline.to(accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 
@@ -204,7 +204,7 @@ def main():
 
         for save_path, prompt in tqdm(explicit_prompt.items()):
             save_path = os.path.join(args.output_dir, save_path)
-            image = pipeline(prompt, generator=generator, num_inference_steps=30, height=536, width=1024).images[0]
+            image = pipeline(prompt, generator=generator, num_inference_steps=50, height=536, width=1024).images[0]
             image = image.resize((1024, 533))
             image.save(save_path)
 
