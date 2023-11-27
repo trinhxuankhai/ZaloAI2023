@@ -34,7 +34,7 @@ from diffusers.optimization import get_scheduler
 from diffusers.training_utils import compute_snr
 from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
-from diffusers import AutoencoderKL, DDPMScheduler, AutoPipelineForImage2Image, EulerAncestralDiscreteScheduler, UNet2DConditionModel, DiffusionPipeline
+from diffusers import AutoencoderKL, DDPMScheduler, DDIMScheduler, UNet2DConditionModel, DiffusionPipeline
 
 from configs.default import get_default_config
 
@@ -458,10 +458,11 @@ def main():
                 revision=args.revision,
                 torch_dtype=weight_dtype,
             )
+            if args.prediction_type == "v_prediction":
+                pipeline.scheduler = DDIMScheduler.from_config(
+                    pipeline.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing"
+                )
             pipeline = pipeline.to(accelerator.device)
-            # pipeline.scheduler = EulerAncestralDiscreteScheduler(
-            #     beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"
-            # )
             pipeline.set_progress_bar_config(disable=True)
 
             # run inference
