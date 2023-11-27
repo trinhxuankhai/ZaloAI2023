@@ -171,7 +171,7 @@ def main():
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
         train_data_trans = pd.read_csv("./data/train/info_trans.csv")
-        with open('./data/train/train_caption_v3.json', 'r') as f:
+        with open('./data/train/llava_caption.json', 'r') as f:
             train_caption = json.load(f)
         
     # Load scheduler, tokenizer and models.
