@@ -12,7 +12,7 @@ TRAIN:
   BATCH_SIZE: 3
   LR:
     MODE: 'cosine'
-    BASE_LR : 1e-6
+    BASE_LR : 1e-4
 
 EVAL:
   EPOCH: 1
