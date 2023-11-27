@@ -6,10 +6,12 @@ DATA:
 
 MODEL:
   NAME: 'runwayml/stable-diffusion-v1-5'
+  VAE: "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/blob/main/vae-ft-mse-840000-ema-pruned.safetensors"
 
 TRAIN:
   EPOCH: 10
   BATCH_SIZE: 6
+  GRADIENT_ACCUMULATION_STEP: 2
   LR:
     MODE: 'cosine'
     BASE_LR : 1e-6
