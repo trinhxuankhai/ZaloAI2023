@@ -121,6 +121,10 @@ def parse_args():
             ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
         ),
     )
+    parser.add_argument(
+        "--vae",
+        action="store_true"
+    )
 
     args = parser.parse_args()
     cfg = get_default_config()
@@ -182,8 +186,11 @@ def main():
     text_encoder = CLIPTextModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
     )
-    # vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
-    vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)
+    if args.vae:
+        vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
+    else:
+        vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)
+        
     unet = UNet2DConditionModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="unet", revision=args.revision
     )

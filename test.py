@@ -15,12 +15,10 @@ from accelerate.utils import set_seed
 import transformers
 from transformers import CLIPTextModel, CLIPTokenizer
 
-from sentence_transformers import SentenceTransformer
-
 import diffusers
 from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
-from diffusers import AutoencoderKL, EulerAncestralDiscreteScheduler, UNet2DConditionModel, DiffusionPipeline
+from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel, DiffusionPipeline
 
 from configs.default import get_default_config
 
@@ -40,6 +38,12 @@ def parse_args():
         "--output_dir",
         type=str,
         help="The output directory where the model predictions and checkpoints will be written.",
+    )
+    parser.add_argument(
+        "--prediction_type",
+        type=str,
+        default=None,
+        help="The prediction_type that shall be used for training. Choose between 'epsilon' or 'v_prediction' or leave `None`. If left to `None` the default prediction type of the scheduler: `noise_scheduler.config.prediciton_type` is chosen.",
     )
     parser.add_argument(
         "--mixed_precision",
@@ -186,6 +190,10 @@ def main():
             revision=args.revision,
             torch_dtype=weight_dtype,
         )
+        if args.prediction_type == "v_prediction":
+            pipeline.scheduler = DDIMScheduler.from_config(
+                pipeline.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing"
+            )
         pipeline = pipeline.to(accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 
