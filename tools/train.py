@@ -1,30 +1,40 @@
-import wandb
-import argparse
-import logging
-import math
 import os
+import math
+import wandb
+import json
 import shutil
+import logging
+import argparse
+import itertools
+import pandas as pd
 from pathlib import Path
+from tqdm.auto import tqdm
+from packaging import version
 
-from datasets.build import build_dataloader
 import torch
-import torch.nn.functional as F
 import torch.utils.checkpoint
-import transformers
+import torch.nn.functional as F
+from datasets.build import build_dataloader
+
+import accelerate 
 from accelerate import Accelerator
 from accelerate.logging import get_logger
+from accelerate.state import AcceleratorState
 from accelerate.utils import ProjectConfiguration, set_seed
-from packaging import version
-from tqdm.auto import tqdm
+
+import transformers
+from transformers.utils import ContextManagers
 from transformers import CLIPTextModel, CLIPTokenizer
 
+from sentence_transformers import SentenceTransformer
+
 import diffusers
-from diffusers import AutoencoderKL, DDPMScheduler, DiffusionPipeline, UNet2DConditionModel
-from diffusers.loaders import AttnProcsLayers
-from diffusers.models.attention_processor import LoRAAttnProcessor
+from diffusers.utils import load_image
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import compute_snr
-from diffusers.utils.import_utils import is_xformers_available
+from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
+from diffusers.models.attention_processor import LoRAAttnProcessor
+from diffusers import AutoencoderKL, DDPMScheduler, DDIMScheduler, UNet2DConditionModel, DiffusionPipeline
 
 from configs.default import get_default_config
 
@@ -111,6 +121,10 @@ def parse_args():
             ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
         ),
     )
+    parser.add_argument(
+        "--vae",
+        action="store_true"
+    )
 
     args = parser.parse_args()
     cfg = get_default_config()
@@ -118,8 +132,7 @@ def parse_args():
     args.cfg = cfg
     print(f"====> load config from {args.config}")
    
-    return args, cfg
-
+    return args, cfg    
 
 def main():
     args, cfg = parse_args()
@@ -158,6 +171,13 @@ def main():
         if args.output_dir is not None:
             os.makedirs(args.output_dir, exist_ok=True)
 
+    # Val
+    accelerator.wait_for_everyone()
+    if accelerator.is_main_process:
+        train_data_trans = pd.read_csv("./data/train/info_trans.csv")
+        with open('./data/train/llava_caption.json', 'r') as f:
+            train_caption = json.load(f)
+        
     # Load scheduler, tokenizer and models.
     noise_scheduler = DDPMScheduler.from_pretrained(cfg.MODEL.NAME, subfolder="scheduler")
     tokenizer = CLIPTokenizer.from_pretrained(
@@ -166,7 +186,11 @@ def main():
     text_encoder = CLIPTextModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
     )
-    vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)
+    if args.vae:
+        vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
+    else:
+        vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)
+        
     unet = UNet2DConditionModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="unet", revision=args.revision
     )
@@ -175,34 +199,18 @@ def main():
     unet.requires_grad_(False)
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
-
-    # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
-    # as these weights are only used for inference, keeping weights in full precision is not required.
+    
     weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16":
         weight_dtype = torch.float16
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
-    vae.to(accelerator.device, dtype=weight_dtype)
+    vae.to(accelerator.device, dtype=torch.float32)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
 
-    # now we will add new LoRA weights to the attention layers
-    # It's important to realize here how many attention weights will be added and of which sizes
-    # The sizes of the attention layers consist only of two different variables:
-    # 1) - the "hidden_size", which is increased according to `unet.config.block_out_channels`.
-    # 2) - the "cross attention size", which is set to `unet.config.cross_attention_dim`.
-
-    # Let's first see how many attention processors we will have to set.
-    # For Stable Diffusion, it should be equal to:
-    # - down blocks (2x attention layers) * (2x transformer layers) * (3x down blocks) = 12
-    # - mid blocks (2x attention layers) * (1x transformer layers) * (1x mid blocks) = 2
-    # - up blocks (2x attention layers) * (3x transformer layers) * (3x down blocks) = 18
-    # => 32 layers
-
-    # Set correct lora layers
+     # Set correct lora layers
     lora_attn_procs = {}
     for name in unet.attn_processors.keys():
         cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
@@ -222,41 +230,22 @@ def main():
         )
 
     unet.set_attn_processor(lora_attn_procs)
-
-    if cfg.MODEL.XFORMERS:
-        if is_xformers_available():
-            import xformers
-
-            xformers_version = version.parse(xformers.__version__)
-            if xformers_version == version.parse("0.0.16"):
-                logger.warn(
-                    "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
-                )
-            unet.enable_xformers_memory_efficient_attention()
-        else:
-            raise ValueError("xformers is not available. Make sure it is installed correctly")
-
     lora_layers = AttnProcsLayers(unet.attn_processors)
 
+    text_lora_parameters = LoraLoaderMixin._modify_text_encoder(
+        text_encoder, dtype=torch.float32, rank=cfg.MODEL.RANK
+    )
+    
+    # Configuration of optimizer
     if cfg.TRAIN.LR.SCALE_LR:
         cfg.TRAIN.LR.BASE_LR = (
             cfg.TRAIN.LR.BASE_LR * cfg.TRAIN.GRADIENT_ACCUMULATION_STEP * cfg.TRAIN.BATCH_SIZE * accelerator.num_processes
         )
 
-    # Initialize the optimizer
-    # if args.use_8bit_adam:
-    #     try:
-    #         import bitsandbytes as bnb
-    #     except ImportError:
-    #         raise ImportError(
-    #             "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
-    #         )
-
-    #     optimizer_cls = bnb.optim.AdamW8bit
     optimizer_cls = torch.optim.AdamW
-
+    params_to_optimize = (itertools.chain(lora_layers.parameters(), text_lora_parameters))
     optimizer = optimizer_cls(
-        lora_layers.parameters(),
+        params_to_optimize,
         lr=cfg.TRAIN.LR.BASE_LR,
         betas=cfg.TRAIN.OPTIMIZER.BETAS,
         weight_decay=cfg.TRAIN.OPTIMIZER.WEIGHT_DECAY,
@@ -278,9 +267,10 @@ def main():
     )
 
     # Prepare everything with our `accelerator`.
-    lora_layers, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
-        lora_layers, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler
-    )
+    if accelerator.is_main_process:
+        lora_layers, text_encoder, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
+            lora_layers, text_encoder, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler
+        )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / cfg.TRAIN.GRADIENT_ACCUMULATION_STEP)
@@ -343,12 +333,15 @@ def main():
 
     for epoch in range(first_epoch, cfg.TRAIN.EPOCH):
         unet.train()
+        text_encoder.train()
+        vae.to(torch.float32)
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
-            with accelerator.accumulate(unet):
+            with accelerator.accumulate(text_encoder):
                 # Convert images to latent space
-                latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
+                latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
+                latents = latents.to(weight_dtype)
 
                 # Sample noise that we'll add to the latents
                 noise = torch.randn_like(latents)
@@ -369,6 +362,7 @@ def main():
 
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+                encoder_hidden_states = encoder_hidden_states.to(weight_dtype)
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -410,7 +404,9 @@ def main():
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    params_to_clip = lora_layers.parameters()
+                    params_to_clip = (
+                        itertools.chain(lora_layers.parameters(), text_lora_parameters)
+                    )
                     accelerator.clip_grad_norm_(params_to_clip, cfg.TRAIN.MAX_NORM)
                 optimizer.step()
                 lr_scheduler.step()
@@ -459,13 +455,21 @@ def main():
             logger.info(
                 f"Running validation..."
             )
+            
             # create pipeline
             pipeline = DiffusionPipeline.from_pretrained(
                 cfg.MODEL.NAME,
+                vae=vae.to(weight_dtype),
+                tokenizer=tokenizer,
+                text_encoder=accelerator.unwrap_model(text_encoder),
                 unet=accelerator.unwrap_model(unet),
                 revision=args.revision,
                 torch_dtype=weight_dtype,
             )
+            if args.prediction_type == "v_prediction":
+                pipeline.scheduler = DDIMScheduler.from_config(
+                    pipeline.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing"
+                )
             pipeline = pipeline.to(accelerator.device)
             pipeline.set_progress_bar_config(disable=True)
 
@@ -474,13 +478,23 @@ def main():
             if cfg.TRAIN.SEED is not None:
                 generator = generator.manual_seed(cfg.TRAIN.SEED)
             
-            images = []
-            captions = []
-            for sample in val_dataloader:
-                images.append(
-                    pipeline(sample["captions"][0], num_inference_steps=30, generator=generator).images[0]
-                )
-                captions.append(sample["captions"][0])
+            total_images = []
+            total_captions = []
+
+            bs = 1
+            data_len = len(train_data_trans)
+            for i in tqdm([972, 1343, 1205, 54, 950, 1042]):
+                prompts = []                    
+                save_paths = []
+                for j in range(i, min(i+bs, data_len)):
+                    save_paths.append(os.path.join(args.output_dir, train_data_trans.iloc[j]["bannerImage"]))
+                    prompts.append(train_caption[train_data_trans.iloc[j]["bannerImage"]])
+
+                images = pipeline(prompts, generator=generator, num_inference_steps=30, height=536, width=1024).images
+                
+                for image, prompt in zip(images, prompts):
+                    total_images.append(image)
+                    total_captions.append(prompt)
 
             for tracker in accelerator.trackers:
                 if tracker.name == "wandb":
@@ -488,7 +502,7 @@ def main():
                         {
                             "validation": [
                                 wandb.Image(image, caption=caption)
-                                for i, (image, caption) in enumerate(zip(images, captions))
+                                for i, (image, caption) in enumerate(zip(total_images, total_captions))
                             ]
                         }
                     )
@@ -498,9 +512,6 @@ def main():
     # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        unet = unet.to(torch.float32)
-        unet.save_attn_procs(args.output_dir)
-
         save_path = os.path.join(args.output_dir, f"final-checkpoint")
         accelerator.save_state(save_path)
         logger.info(f"Saved model to {save_path}")

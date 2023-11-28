@@ -1,1 +1,1 @@
-python3 inference.py --output_dir inference/realvis_prompt
+python3 tools/inference.py --output_dir inference/output

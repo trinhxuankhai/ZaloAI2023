@@ -1,16 +1,25 @@
 import os
-import time
-import torch
+import json
+import logging
 import argparse
-from tqdm.auto import tqdm
+import pandas as pd
+from tqdm import tqdm
+
+import torch
 import torch.utils.checkpoint
+
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from datasets.build import build_dataloader
-from transformers import CLIPTokenizer
-from diffusers import DiffusionPipeline, UNet2DConditionModel
-from diffusers.loaders import AttnProcsLayers
+from accelerate.utils import set_seed
+
+import transformers
+from transformers import CLIPTextModel, CLIPTokenizer
+
+import diffusers
+from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
+from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel, DiffusionPipeline
+
 from configs.default import get_default_config
 
 logger = get_logger(__name__, log_level="INFO")
@@ -19,11 +28,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Trainning script")
     parser.add_argument('--config', default="configs/baseline.yaml", type=str, help='config_file')
     parser.add_argument(
-        "--inference_steps",
-        type=int,
-        default=30,
-    )
-    parser.add_argument(
         "--revision",
         type=str,
         default=None,
@@ -31,16 +35,20 @@ def parse_args():
         help="Revision of pretrained model identifier from huggingface.co/models.",
     )
     parser.add_argument(
-        "--checkpoint_dir",
-        type=str,
-        default="./checkpoints/baseline",
-        help="The output directory where the model predictions and checkpoints will be written.",
+        "--inference_steps",
+        type=int,
+        default=30
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=None,
         help="The output directory where the model predictions and checkpoints will be written.",
+    )
+    parser.add_argument(
+        "--prediction_type",
+        type=str,
+        default=None,
+        help="The prediction_type that shall be used for training. Choose between 'epsilon' or 'v_prediction' or leave `None`. If left to `None` the default prediction type of the scheduler: `noise_scheduler.config.prediciton_type` is chosen.",
     )
     parser.add_argument(
         "--mixed_precision",
@@ -62,43 +70,78 @@ def parse_args():
             ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
         ),
     )
-    
+    parser.add_argument(
+        "--strength",
+        type=float,
+        default=0.6
+    )
+
     args = parser.parse_args()
     cfg = get_default_config()
     cfg.merge_from_file(args.config)
     args.cfg = cfg
     print(f"====> load config from {args.config}")
    
-    return args, cfg
-
+    return args, cfg    
 
 def main():
     args, cfg = parse_args()
-    accelerator = Accelerator()
+    accelerator = Accelerator(
+        gradient_accumulation_steps=cfg.TRAIN.GRADIENT_ACCUMULATION_STEP,
+        mixed_precision=args.mixed_precision,
+    )
+
+    # Make one log on every process with the configuration for debugging.
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO,
+    )
+
+    logger.info(accelerator.state, main_process_only=False)
+    if accelerator.is_local_main_process:
+        transformers.utils.logging.set_verbosity_warning()
+        diffusers.utils.logging.set_verbosity_info()
+    else:
+        transformers.utils.logging.set_verbosity_error()
+        diffusers.utils.logging.set_verbosity_error()
+
+    # If passed along, set the training seed now.
+    if cfg.TRAIN.SEED is not None:
+        set_seed(cfg.TRAIN.SEED)
+
+    ####################################################################
+    with open('./data/test/llava_prompt.json', 'r') as f:
+        explicit_prompt = json.load(f)
 
     # Load scheduler, tokenizer and models.
     tokenizer = CLIPTokenizer.from_pretrained(
         cfg.MODEL.NAME, subfolder="tokenizer", revision=args.revision
     )
+    text_encoder = CLIPTextModel.from_pretrained(
+        cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
+    )
+    vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)   
     unet = UNet2DConditionModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="unet", revision=args.revision
     )
 
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
-
-    # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
-    # as these weights are only used for inference, keeping weights in full precision is not required.
+    vae.requires_grad_(False)
+    text_encoder.requires_grad_(False)
+    
     weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16":
         weight_dtype = torch.float16
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
+    vae.to(accelerator.device, dtype=weight_dtype)
+    text_encoder.to(accelerator.device, dtype=weight_dtype)
 
-    # Set correct lora layers
+     # Set correct lora layers
     lora_attn_procs = {}
     for name in unet.attn_processors.keys():
         cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
@@ -119,79 +162,56 @@ def main():
 
     unet.set_attn_processor(lora_attn_procs)
     lora_layers = AttnProcsLayers(unet.attn_processors)
-    
-    # DataLoaders creation:
-    _, test_dataloader, _ = build_dataloader(cfg, tokenizer)
+
+    text_lora_parameters = LoraLoaderMixin._modify_text_encoder(
+        text_encoder, dtype=torch.float32, rank=cfg.MODEL.RANK
+    )
+
 
     # Prepare everything with our `accelerator`.
-    lora_layers, test_dataloader = accelerator.prepare(
-        lora_layers, test_dataloader
+    lora_layers, text_encoder = accelerator.prepare(
+        lora_layers, text_encoder
     )
 
     # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint:
-        if args.resume_from_checkpoint != "latest":
-            path = os.path.basename(args.resume_from_checkpoint)
-        else:
-            # Get the most recent checkpoint
-            dirs = os.listdir(args.checkpoint_dir)
-            dirs = [d for d in dirs if d.startswith("checkpoint")]
-            dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
-            path = dirs[-1] if len(dirs) > 0 else None
+    accelerator.print(f"Resuming from checkpoint {args.resume_from_checkpoint}")
+    accelerator.load_state(args.resume_from_checkpoint)
 
-        if path is None:
-            accelerator.print(
-                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
+    # Create save dir
+    os.makedirs(args.output_dir, exist_ok=True)
+   
+    if accelerator.is_main_process:
+        logger.info(
+            f"Running validation..."
+        )
+        
+        # create pipeline
+        pipeline = DiffusionPipeline.from_pretrained(
+            cfg.MODEL.NAME,
+            vae=vae.to(weight_dtype),
+            tokenizer=tokenizer,
+            text_encoder=accelerator.unwrap_model(text_encoder),
+            unet=accelerator.unwrap_model(unet),
+            revision=args.revision,
+            torch_dtype=weight_dtype,
+        )
+        if args.prediction_type == "v_prediction":
+            pipeline.scheduler = DDIMScheduler.from_config(
+                pipeline.scheduler.config, rescale_betas_zero_snr=True, timestep_spacing="trailing"
             )
-            args.resume_from_checkpoint = None
-        else:
-            accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(args.checkpoint_dir, path))
-    
-    progress_bar = tqdm(
-        range(0, len(test_dataloader)),
-        initial=0,
-        desc="Steps",
-    )
+        pipeline = pipeline.to(accelerator.device)
+        pipeline.set_progress_bar_config(disable=True)
 
-    logger.info(
-        f"Running testing......"
-    )
+        # run inference
+        generator = torch.Generator(device=accelerator.device)
+        if cfg.TRAIN.SEED is not None:
+            generator = generator.manual_seed(cfg.TRAIN.SEED)
 
-    # create pipeline
-    pipeline = DiffusionPipeline.from_pretrained(
-        cfg.MODEL.NAME,
-        unet=accelerator.unwrap_model(unet),
-        revision=args.revision,
-        torch_dtype=weight_dtype,
-    )
-    pipeline = pipeline.to(accelerator.device)
-    pipeline.set_progress_bar_config(disable=True)
-
-    # run inference
-    generator = torch.Generator(device=accelerator.device)
-    if cfg.TRAIN.SEED is not None:
-        generator = generator.manual_seed(cfg.TRAIN.SEED)
-    
-    # create output folder
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir, exist_ok=True)
-
-    start = time.time()
-    for sample in test_dataloader:
-        save_paths = []
-        for path in sample["paths"]:
-            save_paths.append(os.path.join(args.output_dir, path))
-
-        images = pipeline(sample["captions"], num_inference_steps=args.inference_steps, generator=generator, height=536, width=1024).images
-
-        for image, save_path in zip(images, save_paths):
+        for save_path, prompt in tqdm(explicit_prompt.items()):
+            save_path = os.path.join(args.output_dir, save_path)
+            image = pipeline(prompt, generator=generator, num_inference_steps=args.inference_steps, height=536, width=1024).images[0]
             image = image.resize((1024, 533))
             image.save(save_path)
-        progress_bar.update(1)
-    end = time.time()
-    logger.info(
-        f"Total inference time: {end-start} s"
-    )
+
 if __name__ == "__main__":
     main()

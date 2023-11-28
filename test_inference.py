@@ -13,7 +13,6 @@ def main():
     # Load model
     disable_torch_init()
     model_path = "liuhaotian/llava-v1.5-7b"
-    # model_path = "liuhaotian/llava-v1.5-13b"
 
     model_name = get_model_name_from_path(model_path)
     tokenizer, model, image_processor, context_len = load_pretrained_model(
