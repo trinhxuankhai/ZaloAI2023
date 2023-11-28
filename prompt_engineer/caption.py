@@ -82,5 +82,5 @@ class Prompt:
             return sentence
 
 if __name__ == "__main__":
-    prompt_eng = Prompt(origin_file="data/train/info_trans.csv", augument_file="data/train/llava_caption.json")
-    output = prompt_eng.create_explicit_prompt(input_path="data/test/info_trans.csv", output_path="data/test/llava_prompt.json")
+    prompt_eng = Prompt(origin_file="./data/train/info_trans.csv", augument_file="./data/train/llava_caption.json")
+    output = prompt_eng.create_explicit_prompt(input_path="./data/test/info_trans.csv", output_path="./data/test/llava_prompt.json")

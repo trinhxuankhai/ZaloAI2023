@@ -1,1 +1,1 @@
-python3 tools/inference.py --output_dir inference/output
+python3 tools/inference.py --output_dir inference/method_1

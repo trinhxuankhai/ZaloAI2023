@@ -18,10 +18,6 @@ _C.DATA.RESOLUTION = 512
 _C.DATA.CENTER_CROP = False
 _C.DATA.RANDOM_FLIP = False
 _C.DATA.RANDOM_AUG = False
-_C.DATA.COND_IMAGES = False
-_C.DATA.FONT = 'fonts/BeVietnam-Bold.ttf'
-_C.DATA.FONT_SIZE = 36
-_C.DATA.CRAWL_IMAGES = False
 
 # Model specific configurations.
 _C.MODEL = CN()
@@ -29,9 +25,7 @@ _C.MODEL.NAME = 'stabilityai/stable-diffusion-2-1'
 _C.MODEL.XFORMERS = False # Whether or not to use xformers for memory efficient.
 _C.MODEL.NOISE_OFFSET = 0 # https://www.crosslabs.org//blog/diffusion-with-offset-noise
 _C.MODEL.RANK = 4 # Lora rank.
-_C.MODEL.CONTROL_NET = None
 _C.MODEL.VAE = None
-
 
 # Training configurations
 _C.TRAIN = CN()

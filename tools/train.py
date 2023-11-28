@@ -9,27 +9,20 @@ import itertools
 import pandas as pd
 from pathlib import Path
 from tqdm.auto import tqdm
-from packaging import version
 
 import torch
 import torch.utils.checkpoint
 import torch.nn.functional as F
 from datasets.build import build_dataloader
 
-import accelerate 
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from accelerate.state import AcceleratorState
 from accelerate.utils import ProjectConfiguration, set_seed
 
 import transformers
-from transformers.utils import ContextManagers
 from transformers import CLIPTextModel, CLIPTokenizer
 
-from sentence_transformers import SentenceTransformer
-
 import diffusers
-from diffusers.utils import load_image
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import compute_snr
 from diffusers.loaders import LoraLoaderMixin, AttnProcsLayers
@@ -121,10 +114,6 @@ def parse_args():
             ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
         ),
     )
-    parser.add_argument(
-        "--vae",
-        action="store_true"
-    )
 
     args = parser.parse_args()
     cfg = get_default_config()
@@ -186,11 +175,7 @@ def main():
     text_encoder = CLIPTextModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="text_encoder", revision=args.revision
     )
-    if args.vae:
-        vae = AutoencoderKL.from_single_file(cfg.MODEL.VAE)   
-    else:
-        vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision)
-        
+    vae = AutoencoderKL.from_pretrained(cfg.MODEL.NAME, subfolder="vae", revision=args.revision) 
     unet = UNet2DConditionModel.from_pretrained(
         cfg.MODEL.NAME, subfolder="unet", revision=args.revision
     )
