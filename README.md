@@ -45,12 +45,12 @@ bash run/inference.sh
 
 ## Method 2: Finetunning Stable Diffusion model
 ### Solution
-- Our team's solution is to use [LLAVA](https://github.com/haotian-liu/LLaVA) model to captioning the trainning dataset and perform finetunning Stable Diffusion model on the trainning data. 
+- Our team's solution is to use [LLaVA](https://github.com/haotian-liu/LLaVA) model to captioning the trainning dataset and perform finetunning Stable Diffusion model on the trainning data. 
 - During inference, we use LLM to generate more correct caption from test data.
 - From our experiment, [Stable Diffusion 2.1](https://huggingface.co/stabilityai/stable-diffusion-2-1) can easily finetuned to adapt the trainning data.
 
 ### Step to reproduce result
-- LLAVA for image captioning: [llava](preprocessing/README.md)
+- LLaVA for image captioning: [llava](preprocessing/README.md)
 - Finetunning Stable Diffusion model:
 ```
 bash run/train_sd.py
@@ -66,4 +66,4 @@ bash run/inference_sd.sh
 
 ### Limitation
 - For this solution, our team can achieve considerable score 0.39673 from Zalo AI Benchmark. 
-- However, for this solution our inference time up to 3.xx hours due to the large inference time of Large Language Model.
+- However, for this solution our inference time up to 3.xx hours which failed real time inference time on Zalo AI Benchmark due to the large inference time of Large Language Model.
