@@ -1,5 +1,19 @@
+''' use for cuda 11.8 version
+# Install vLLM with CUDA 11.8.
+# Replace `cp310` with your Python version (e.g., `cp38`, `cp39`, `cp311`).
+pip install https://github.com/vllm-project/vllm/releases/download/v0.2.2/vllm-0.2.2+cu118-cp310-cp310-manylinux1_x86_64.whl
+
+# Re-install PyTorch with CUDA 11.8.
+pip uninstall torch -y
+pip install torch --upgrade --index-url https://download.pytorch.org/whl/cu118
+'''
+
+''' for cuda 12.1
+pip install vllm
+'''
+
 import torch
-from ctransformers import AutoModelForCausalLM
+from vllm import LLM, SamplingParams
 from sentence_transformers import SentenceTransformer
 import pandas as pd
 import json
@@ -12,9 +26,9 @@ class Prompt:
             origin_file:str="data/train/info_trans.csv",
             augument_file:str="data/train/train_caption_v3.json"
     ):
-        config = {'max_new_tokens': 77, 'repetition_penalty': 1.2, 'temperature': 0.9, 'stream': False, 'context_length':1024, 'top_k':150, 'top_p':0.95}
+        #config = {'max_new_tokens': 77, 'repetition_penalty': 1.2, 'temperature': 0.9, 'stream': False, 'context_length':1024, 'top_k':150, 'top_p':0.95}
         self.sentence_embed_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-        self.llm = AutoModelForCausalLM.from_pretrained("TheBloke/neural-chat-7B-v3-1-GGUF", model_file="neural-chat-7b-v3-1.Q4_K_M.gguf", model_type="llama", gpu_layers=50, **config)
+        self.llm = LLM(model="mistralai/Mistral-7B-Instruct-v0.1")
         with open(augument_file, 'r') as f:
             self.augument_caption = json.load(f)
         self.origin_caption = pd.read_csv(origin_file)
@@ -23,18 +37,38 @@ class Prompt:
         self.create_tensor()
         self.caption_embeds = torch.load('prompt_engineer/prompt_tensor/prompt_tensor.pt')
 
-    def create_explicit_prompt(self, input_path:str="data/test/info_trans.csv", output_path:str="prompt_engineer/result/explicit_prompt.json"):
+    def create_explicit_prompt(
+            self,
+            input_path:str="data/test/info_trans.csv",
+            output_path:str="prompt_engineer/result/explicit_prompt.json",
+            batch_size=4,
+            sampling_params = SamplingParams(temperature=0.9, top_p=0.95, max_tokens=77, repitition_penalty=1.2, top_k=150),
+    ):
         '''
         the input path must be csv data type have the same format with origin file
         the origin caption containt implicit description for image so this function will use LLM to generate explicit description to generate image by SD model
         '''
+        ids = list(pd.read_csv(input_path)['bannerImage'])
+        results = {}
+        outputs = []
+        prompts = self.create_prompt(input_path=input_path)
+        for i in range(0, len(prompts), batch_size):
+            input_prompts = prompts[i:i+batch_size]
+            generate_seqs = self.llm.generate(input_prompts, sampling_params)
+            for generate_seq in generate_seqs:
+                outputs.append(generate_seq.outputs[0].text)
+        for gen_output, image_ids in zip(outputs, ids):
+            results[image_ids] = gen_output
+        if output_path:
+            with open(output_path, 'w') as f:
+                json.dump(results, f, indent=4)
+        return results
+    
+    def create_prompt(self, input_path:str="data/test/info_trans.csv"):
         input_data = pd.read_csv(input_path)
-        # captions, ids = list(pd.read_csv(input_path)['caption']), list(pd.read_csv(input_path)['bannerImage'])
-        outputs = {}
-        # for caption, cap_id in tqdm(zip(captions, ids)):
+        prompts = []
         for i in tqdm(range(len(input_data))):
             sample = input_data.iloc[i]
-            cap_id = sample['bannerImage']
             caption = sample["caption"].strip('.') + '. ' + sample["description"].strip('.') + '.'
             
             caption_embed = self.sentence_embed_model.encode([caption], convert_to_tensor=True)
@@ -47,17 +81,9 @@ class Prompt:
             fewshot_in1 = self.cut_long_sentence(sample_2["caption"].strip('.') + '. ' + sample_2["description"] + '.')
             fewshot_out0 = self.cut_long_sentence(self.augument_caption[self.origin_caption.iloc[int(sort_index[0])]["bannerImage"]])
             fewshot_out1 = self.cut_long_sentence(self.augument_caption[self.origin_caption.iloc[int(sort_index[1])]["bannerImage"]])
-                        
-            # prompt = f"Describe the advertisement image from the following advertisement sentence\n\nAdvertisement: {fewshot_in0}\nAdvertisement description: {fewshot_out0}\n\nAdvertisement: {fewshot_in1}\nAdvertisement description: {fewshot_out1}\n\nAdvertisement: {caption}\nAdvertisement photo description:"
-            prompt = f"Describe the advertisement image from the following advertisement sentence\n\nAdvertisement: {fewshot_in0}\nAdvertisement description: {fewshot_out0}\n\nAdvertisement: {caption}\nAdvertisement photo description:"
-            output = self.llm(prompt, stream=False)
-            output = output.split('\n')[0].strip()
-            outputs[cap_id] = output
-
-        if output_path:
-            with open(output_path, 'w') as f:
-                json.dump(outputs, f, indent=4)
-        return outputs
+            prompt = f"Describe the advertisement image from the following advertisement sentence\n\nAdvertisement: {fewshot_in0}\nAdvertisement description: {fewshot_out0}\n\nAdvertisement: {fewshot_in1}\nAdvertisement description: {fewshot_out1}\n\nAdvertisement: {caption}\nAdvertisement photo description:"
+            prompts.append(prompt)
+        return prompts
     
     def generate_ad_object(self, input_path:str="data/test_info.csv", output_path:str="prompt_engineer/result/object.json"):
         '''

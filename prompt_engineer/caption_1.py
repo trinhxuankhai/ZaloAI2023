@@ -14,7 +14,7 @@ class Prompt:
     ):
         config = {'max_new_tokens': 77, 'repetition_penalty': 1.2, 'temperature': 0.9, 'stream': False, 'context_length':1024, 'top_k':150, 'top_p':0.95}
         self.sentence_embed_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-        self.llm = AutoModelForCausalLM.from_pretrained("TheBloke/neural-chat-7B-v3-1-GGUF", model_file="neural-chat-7b-v3-1.Q4_K_M.gguf", model_type="llama", gpu_layers=50, **config)
+        self.llm = AutoModelForCausalLM.from_pretrained("TheBloke/Amethyst-13B-Mistral-GGUF", model_file="amethyst-13b-mistral.Q4_K_M.gguf", model_type="llama", gpu_layers=50, **config)
         with open(augument_file, 'r') as f:
             self.augument_caption = json.load(f)
         self.origin_caption = pd.read_csv(origin_file)
@@ -29,10 +29,10 @@ class Prompt:
         the origin caption containt implicit description for image so this function will use LLM to generate explicit description to generate image by SD model
         '''
         input_data = pd.read_csv(input_path)
-        # captions, ids = list(pd.read_csv(input_path)['caption']), list(pd.read_csv(input_path)['bannerImage'])
         outputs = {}
-        # for caption, cap_id in tqdm(zip(captions, ids)):
-        for i in tqdm(range(len(input_data))):
+        start = 0
+        end = int(len(input_data)/2)
+        for i in tqdm(range(start, end)):
             sample = input_data.iloc[i]
             cap_id = sample['bannerImage']
             caption = sample["caption"].strip('.') + '. ' + sample["description"].strip('.') + '.'
