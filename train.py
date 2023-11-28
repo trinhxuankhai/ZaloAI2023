@@ -267,9 +267,10 @@ def main():
     )
 
     # Prepare everything with our `accelerator`.
-    lora_layers, text_encoder, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
-        lora_layers, text_encoder, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler
-    )
+    if accelerator.is_main_process:
+        lora_layers, text_encoder, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler = accelerator.prepare(
+            lora_layers, text_encoder, optimizer, train_dataloader, test_dataloader, val_dataloader, lr_scheduler
+        )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / cfg.TRAIN.GRADIENT_ACCUMULATION_STEP)
